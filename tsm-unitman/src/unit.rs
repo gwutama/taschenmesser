@@ -3,6 +3,9 @@ use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
 
 
+pub type UnitRef = Arc<Mutex<Unit>>;
+
+
 #[derive(Debug, PartialEq)]
 pub enum RestartPolicy {
     Always,
@@ -14,7 +17,7 @@ pub struct Unit {
     name: String,
     executable: String,
     arguments: Vec<String>,
-    dependencies: Vec<Arc<Mutex<Unit>>>,
+    dependencies: Vec<UnitRef>,
     restart_policy: RestartPolicy,
     uid: Option<u32>,
     gid: Option<u32>,
@@ -28,7 +31,7 @@ impl Unit {
         name: String,
         executable: String,
         arguments: Vec<String>,
-        dependencies: Vec<Arc<Mutex<Unit>>>,
+        dependencies: Vec<UnitRef>,
         restart_policy: RestartPolicy,
         enabled: bool,
     ) -> Unit {
@@ -177,7 +180,7 @@ mod tests {
         );
     }
 
-    fn gen_mutex_units() -> (Arc<Mutex<Unit>>, Arc<Mutex<Unit>>) {
+    fn gen_mutex_units() -> (UnitRef, UnitRef) {
         let unit1 = Arc::new(Mutex::new(Unit::new(
             String::from("test1"),
             String::from("ls"),
