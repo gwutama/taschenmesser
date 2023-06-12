@@ -33,7 +33,7 @@ impl Runner {
 
         return match manager_lock {
             Ok(manager) => {
-                let should_stop = manager.should_stop.lock();
+                let should_stop = manager.stop_requested.lock();
                 match should_stop {
                     Ok(should_stop) => {
                         *should_stop

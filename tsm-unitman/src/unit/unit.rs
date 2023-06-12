@@ -48,6 +48,24 @@ impl Unit {
         }
     }
 
+    pub fn new_ref(
+        name: String,
+        executable: String,
+        arguments: Vec<String>,
+        dependencies: Vec<UnitRef>,
+        restart_policy: RestartPolicy,
+        enabled: bool,
+    ) -> UnitRef {
+        Arc::new(Mutex::new(Unit::new(
+            name,
+            executable,
+            arguments,
+            dependencies,
+            restart_policy,
+            enabled,
+        )))
+    }
+
     pub fn name(&self) -> &String {
         return &self.name;
     }
@@ -169,7 +187,7 @@ impl Unit {
 mod tests {
     use super::*;
 
-    fn gen_simple_unit() -> Unit {
+    fn build_unit() -> Unit {
         return Unit::new(
             String::from("test"),
             String::from("sleep"),
@@ -180,31 +198,31 @@ mod tests {
         );
     }
 
-    fn gen_mutex_units() -> (UnitRef, UnitRef) {
-        let unit1 = Arc::new(Mutex::new(Unit::new(
+    fn build_unitrefs() -> (UnitRef, UnitRef) {
+        let unit1 = Unit::new_ref(
             String::from("test1"),
             String::from("ls"),
             vec![],
             vec![],
             RestartPolicy::Always,
             true,
-        )));
+        );
 
-        let unit2 = Arc::new(Mutex::new(Unit::new(
+        let unit2 = Unit::new_ref(
             String::from("test2"),
             String::from("ls"),
             vec![],
             vec![unit1.clone()],
             RestartPolicy::Never,
             true,
-        )));
+        );
 
         return (unit1, unit2);
     }
 
     #[test]
     fn new_returns_new_unit() {
-        let unit = gen_simple_unit();
+        let unit = build_unit();
 
         assert_eq!(unit.name, "test");
         assert_eq!(unit.executable, "sleep");
@@ -216,14 +234,14 @@ mod tests {
 
     #[test]
     fn new_returns_correct_name() {
-        let unit = gen_simple_unit();
+        let unit = build_unit();
 
         assert_eq!(unit.name(), "test");
     }
 
     #[test]
     fn pid_returns_not_none() {
-        let mut unit = gen_simple_unit();
+        let mut unit = build_unit();
 
         unit.start().unwrap();
         assert_ne!(unit.pid(), None);
@@ -231,14 +249,14 @@ mod tests {
 
     #[test]
     fn is_running_returns_correct_values_at_init() {
-        let unit = gen_simple_unit();
+        let unit = build_unit();
 
         assert_eq!(unit.is_running(), false);
     }
 
     #[test]
     fn is_running_returns_correct_values_after_start() {
-        let mut unit = gen_simple_unit();
+        let mut unit = build_unit();
 
         assert_eq!(unit.is_running(), false);
         unit.start().unwrap();
@@ -247,7 +265,7 @@ mod tests {
 
     #[test]
     fn is_running_returns_correct_values_after_stop() {
-        let mut unit = gen_simple_unit();
+        let mut unit = build_unit();
 
         assert_eq!(unit.is_running(), false);
         unit.start().unwrap();
@@ -258,7 +276,7 @@ mod tests {
 
     #[test]
     fn cannot_start_if_already_started() {
-        let mut unit = gen_simple_unit();
+        let mut unit = build_unit();
 
         unit.start().unwrap();
         assert!(unit.start().is_err());
@@ -266,14 +284,14 @@ mod tests {
 
     #[test]
     fn cannot_stop_if_already_stopped() {
-        let mut unit = gen_simple_unit();
+        let mut unit = build_unit();
 
         assert!(unit.stop().is_err());
     }
 
     #[test]
     fn can_start_when_dependent_unit_is_running() {
-        let (unit1, unit2) = gen_mutex_units();
+        let (unit1, unit2) = build_unitrefs();
 
         unit1.lock().unwrap().start().unwrap();
         assert_eq!(unit1.lock().unwrap().is_running(), true);
@@ -282,7 +300,7 @@ mod tests {
 
     #[test]
     fn cannot_start_when_dependent_unit_is_not_running() {
-        let (unit1, unit2) = gen_mutex_units();
+        let (unit1, unit2) = build_unitrefs();
 
         assert_eq!(unit1.lock().unwrap().is_running(), false);
         assert!(unit2.lock().unwrap().can_start().is_err());
@@ -290,7 +308,7 @@ mod tests {
 
     #[test]
     fn can_stop_when_dependent_unit_is_not_running() {
-        let (unit1, unit2) = gen_mutex_units();
+        let (unit1, unit2) = build_unitrefs();
 
         assert_eq!(unit1.lock().unwrap().is_running(), false);
         assert_eq!(unit2.lock().unwrap().can_stop().unwrap(), true);
@@ -298,7 +316,7 @@ mod tests {
 
     #[test]
     fn cannot_stop_when_dependent_unit_is_running() {
-        let (unit1, unit2) = gen_mutex_units();
+        let (unit1, unit2) = build_unitrefs();
 
         unit1.lock().unwrap().start().unwrap();
         assert_eq!(unit1.lock().unwrap().is_running(), true);
