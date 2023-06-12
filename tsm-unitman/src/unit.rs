@@ -119,7 +119,7 @@ impl Unit {
                 }
             }
             None => {
-                return Err(format!("Unit {} is not running", self.name));
+                return Err(format!("Cannot stop unit {} because it is NOT running", self.name));
             }
         }
 
@@ -127,35 +127,37 @@ impl Unit {
     }
 
     /// A unit is allowed to start if it is enabled and all dependencies are running
-    fn can_start(&self) -> bool {
+    fn can_start(&self) -> Result<bool, String> {
         if !self.enabled {
-            return false;
+            return Err(format!("Unit {} is not enabled", self.name));
         }
 
         for dependency in &self.dependencies {
             let unit = dependency.lock().unwrap();
             if !unit.is_running() {
-                return false;
+                return Err(format!("Cannot start unit {} because its dependency unit {} is NOT running",
+                                   self.name, unit.name));
             }
         }
 
-        return true;
+        return Ok(true);
     }
 
     /// A unit is allowed to start if it is enabled and all dependencies are stopped
-    fn can_stop(&self) -> bool {
+    fn can_stop(&self) -> Result<bool, String> {
         if !self.enabled {
-            return false;
+            return Err(format!("Cannot stop unit {} because it is disabled", self.name));
         }
 
         for dependency in &self.dependencies {
             let unit = dependency.lock().unwrap();
             if unit.is_running() {
-                return false;
+                return Err(format!("Cannot stop unit {} because its dependency unit {} is running",
+                                   self.name, unit.name));
             }
         }
 
-        return true;
+        return Ok(true);
     }
 }
 
@@ -272,7 +274,7 @@ mod tests {
 
         unit1.lock().unwrap().start().unwrap();
         assert_eq!(unit1.lock().unwrap().is_running(), true);
-        assert_eq!(unit2.lock().unwrap().can_start(), true);
+        assert_eq!(unit2.lock().unwrap().can_start().unwrap(), true);
     }
 
     #[test]
@@ -280,7 +282,7 @@ mod tests {
         let (unit1, unit2) = gen_mutex_units();
 
         assert_eq!(unit1.lock().unwrap().is_running(), false);
-        assert_eq!(unit2.lock().unwrap().can_start(), false);
+        assert!(unit2.lock().unwrap().can_start().is_err());
     }
 
     #[test]
@@ -288,7 +290,7 @@ mod tests {
         let (unit1, unit2) = gen_mutex_units();
 
         assert_eq!(unit1.lock().unwrap().is_running(), false);
-        assert_eq!(unit2.lock().unwrap().can_stop(), true);
+        assert_eq!(unit2.lock().unwrap().can_stop().unwrap(), true);
     }
 
     #[test]
@@ -297,6 +299,6 @@ mod tests {
 
         unit1.lock().unwrap().start().unwrap();
         assert_eq!(unit1.lock().unwrap().is_running(), true);
-        assert_eq!(unit2.lock().unwrap().can_stop(), false);
+        assert!(unit2.lock().unwrap().can_stop().is_err());
     }
 }
