@@ -1,0 +1,26 @@
+[application]
+log_level = "debug"
+
+[watchdog]
+enabled = true
+interval_s = 10
+
+[unit]
+
+[unit.foo]
+executable = "ls"
+arguments = [ "-l", "-a" ]
+dependencies = []
+restart_policy = "always" # implies that watchdog events must be sent by the executable
+uid = "" # default. If empty, the user of the current process is used
+gid = "" # default. If empty, the group of the current process is used
+enabled = true # default
+
+[unit.bar]
+executable = "ps"
+arguments = [ "-aux" ]
+dependencies = [ "foo" ]
+restart_policy = "never" # run once, no watchdog events are expected
+uid = "" # default. If empty, the user of the current process is used
+gid = "" # default. If empty, the group of the current process is used
+enabled = true # default
