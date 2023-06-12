@@ -1,19 +1,19 @@
 use std::sync::{Arc, LockResult, Mutex, MutexGuard};
-use crate::unit::{UnitRef};
+use crate::unit::unit::UnitRef;
 
 
-pub type UnitManagerRef = Arc<Mutex<UnitManager>>;
+pub type ManagerRef = Arc<Mutex<Manager>>;
 
 
-pub struct UnitManager {
+pub struct Manager {
     units: Vec<UnitRef>,
     pub should_stop: Arc<Mutex<bool>>,
 }
 
 
-impl UnitManager {
-    pub fn new() -> UnitManager {
-        UnitManager {
+impl Manager {
+    pub fn new() -> Manager {
+        Manager {
             units: Vec::new(),
             should_stop: Arc::new(Mutex::new(false)),
         }

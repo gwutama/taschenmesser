@@ -2,38 +2,38 @@ use std::sync::MutexGuard;
 use std::thread::{sleep, spawn};
 use std::thread::JoinHandle;
 use std::time::Duration;
-use crate::unit_manager::{UnitManager, UnitManagerRef};
+use crate::unit::manager::{Manager, ManagerRef};
 
 
-pub struct UnitManagerRunner {}
+pub struct Runner {}
 
 
-impl UnitManagerRunner {
+impl Runner {
     /// Spawn a thread that executes UnitManager.start_all() within an infinite loop.
     /// The thread can be stopped by setting the should_stop flag to true.
-    pub fn run_threaded(unit_manager: UnitManagerRef) -> JoinHandle<()> {
+    pub fn run_threaded(manager: ManagerRef) -> JoinHandle<()> {
         let thread_handle = spawn(move || {
             loop {
-                if Self::test_should_stop(unit_manager.clone()) {
+                if Self::test_should_stop(manager.clone()) {
                     break;
                 }
 
-                Self::start_units(unit_manager.clone());
+                Self::start_units(manager.clone());
                 sleep(Duration::from_millis(200));
             }
 
-            Self::cleanup_units(unit_manager.clone());
+            Self::cleanup_units(manager.clone());
         });
 
         return thread_handle;
     }
 
-    fn test_should_stop(unit_manager: UnitManagerRef) -> bool {
-        let unit_manager_lock = unit_manager.lock();
+    fn test_should_stop(manager: ManagerRef) -> bool {
+        let manager_lock = manager.lock();
 
-        return match unit_manager_lock {
-            Ok(unit_manager) => {
-                let should_stop = unit_manager.should_stop.lock();
+        return match manager_lock {
+            Ok(manager) => {
+                let should_stop = manager.should_stop.lock();
                 match should_stop {
                     Ok(should_stop) => {
                         *should_stop
@@ -51,18 +51,18 @@ impl UnitManagerRunner {
         }
     }
 
-    fn start_units(unit_manager: UnitManagerRef) {
-        let unit_manager_lock = unit_manager.lock();
+    fn start_units(manager: ManagerRef) {
+        let manager_lock = manager.lock();
 
-        match unit_manager_lock {
-            Ok(mut unit_manager) => {
-                match unit_manager.all_units_running() {
+        match manager_lock {
+            Ok(mut manager) => {
+                match manager.all_units_running() {
                     Ok(true) => {
                         println!("All units are running");
                     }
                     Ok(false) => {
                         println!("Not all units are running");
-                        unit_manager.start_all();
+                        manager.start_all();
                     }
                     Err(e) => {
                         println!("Error checking if all units are running: {}", e);
@@ -75,16 +75,16 @@ impl UnitManagerRunner {
         }
     }
 
-    fn cleanup_units(unit_manager: UnitManagerRef) {
-        let mut unit_manager_lock = unit_manager.lock();
-        match unit_manager_lock {
-            Ok(mut unit_manager) => {
-                match unit_manager.all_units_stopped() {
+    fn cleanup_units(manager: ManagerRef) {
+        let mut manager_lock = manager.lock();
+        match manager_lock {
+            Ok(mut manager) => {
+                match manager.all_units_stopped() {
                     Ok(true) => {
                         println!("All units are stopped");
                     }
                     Ok(false) => {
-                        Self::wait_stop_all_units(&mut unit_manager);
+                        Self::wait_stop_all_units(&mut manager);
                     }
                     Err(e) => {
                         println!("Error checking if all units are stopped: {}", e);
@@ -97,17 +97,17 @@ impl UnitManagerRunner {
         }
     }
 
-    fn wait_stop_all_units(unit_manager: &mut MutexGuard<UnitManager>) {
+    fn wait_stop_all_units(manager: &mut MutexGuard<Manager>) {
         println!("Stopping units");
 
         loop {
-            match unit_manager.all_units_stopped() {
+            match manager.all_units_stopped() {
                 Ok(true) => {
                     println!("All units are stopped");
                     break;
                 },
                 Ok(false) => {
-                    unit_manager.stop_all()
+                    manager.stop_all()
                 },
                 Err(e) => {
                     println!("Error checking if all units are stopped: {}", e);
