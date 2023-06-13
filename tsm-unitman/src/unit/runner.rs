@@ -94,7 +94,7 @@ impl Runner {
     }
 
     fn cleanup_units(manager: ManagerRef) {
-        let mut manager_lock = manager.lock();
+        let manager_lock = manager.lock();
         match manager_lock {
             Ok(mut manager) => {
                 match manager.all_units_stopped() {

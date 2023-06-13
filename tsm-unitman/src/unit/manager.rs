@@ -1,4 +1,4 @@
-use std::sync::{Arc, LockResult, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use crate::unit::unit::{Unit, UnitRef, RestartPolicy};
 
 
