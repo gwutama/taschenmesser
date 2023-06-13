@@ -1,6 +1,7 @@
 use std::process::{Command, Child};
 use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
+use sysinfo::{System, SystemExt, PidExt, Pid, ProcessRefreshKind};
 
 
 pub type UnitRef = Arc<Mutex<Unit>>;
@@ -26,6 +27,7 @@ pub struct Unit {
     gid: Option<u32>,
     enabled: bool,
     child: Option<Box<Child>>,
+    system_info: System,
 }
 
 
@@ -48,6 +50,7 @@ impl Unit {
             gid: None,
             enabled,
             child: None,
+            system_info: sysinfo::System::new(),
         }
     }
 
@@ -73,19 +76,40 @@ impl Unit {
         return &self.name;
     }
 
+    pub fn restart_policy(&self) -> &RestartPolicy {
+        return &self.restart_policy;
+    }
+
     /// A unit is running if it has a child process
-    pub fn is_running(&self) -> bool {
-        return self.child.is_some();
+    pub fn test_running(&mut self) -> bool {
+        return match self.child {
+            Some(ref child) => {
+                // Check if child process is still alive
+                let pid = Pid::from_u32(child.id());
+                let refresh_kind = ProcessRefreshKind::new();
+                let process_exists = self.system_info.refresh_process_specifics(pid, refresh_kind);
+
+                if process_exists {
+                    true
+                } else {
+                    self.child = None;
+                    false
+                }
+            }
+            None => {
+                false
+            }
+        }
     }
 
     /// Returns the Process ID (PID) of a child process, if it exists
     pub fn pid(&self) -> Option<u32> {
-        match self.child {
+        return match self.child {
             Some(ref child) => {
-                return Some(child.id());
+                Some(child.id())
             }
             None => {
-                return None;
+                None
             }
         }
     }
@@ -158,19 +182,19 @@ impl Unit {
     }
 
     /// A unit is allowed to start if it is enabled and all dependencies are running
-    fn can_start(&self) -> (bool, String) {
+    fn can_start(&mut self) -> (bool, String) {
         if !self.enabled {
             return (false, String::from("Unit is not enabled"));
         }
 
         // ignore if unit is running, i.e. child is not None
-        if self.is_running() {
+        if self.test_running() {
             return (false, String::from("Unit is already running"));
         }
 
         for dependency in &self.dependencies {
-            let unit = dependency.lock().unwrap();
-            if !unit.is_running() {
+            let mut unit = dependency.lock().unwrap();
+            if !unit.test_running() {
                 return (false, format!("Unit depends on {} but it is not running", unit.name));
             }
         }
@@ -179,19 +203,19 @@ impl Unit {
     }
 
     /// A unit is allowed to start if it is enabled and all dependencies are stopped
-    fn can_stop(&self) -> (bool, String) {
+    fn can_stop(&mut self) -> (bool, String) {
         if !self.enabled {
             return (false, String::from("Unit is not enabled"));
         }
 
         // ignore if unit is stopped, i.e. child is None
-        if !self.is_running() {
+        if !self.test_running() {
             return (false, String::from("Unit is already stopped"));
         }
 
         for dependency in &self.dependencies {
-            let unit = dependency.lock().unwrap();
-            if unit.is_running() {
+            let mut unit = dependency.lock().unwrap();
+            if unit.test_running() {
                 return (false, format!("Unit depends on {} but it is still running", unit.name));
             }
         }
@@ -267,29 +291,29 @@ mod tests {
 
     #[test]
     fn is_running_returns_correct_values_at_init() {
-        let unit = build_unit();
+        let mut unit = build_unit();
 
-        assert_eq!(unit.is_running(), false);
+        assert_eq!(unit.test_running(), false);
     }
 
     #[test]
     fn is_running_returns_correct_values_after_start() {
         let mut unit = build_unit();
 
-        assert_eq!(unit.is_running(), false);
+        assert_eq!(unit.test_running(), false);
         unit.start().unwrap();
-        assert_eq!(unit.is_running(), true);
+        assert_eq!(unit.test_running(), true);
     }
 
     #[test]
     fn is_running_returns_correct_values_after_stop() {
         let mut unit = build_unit();
 
-        assert_eq!(unit.is_running(), false);
+        assert_eq!(unit.test_running(), false);
         unit.start().unwrap();
-        assert_eq!(unit.is_running(), true);
+        assert_eq!(unit.test_running(), true);
         unit.stop().unwrap();
-        assert_eq!(unit.is_running(), false);
+        assert_eq!(unit.test_running(), false);
     }
 
     #[test]
@@ -312,7 +336,7 @@ mod tests {
         let (unit1, unit2) = build_unitrefs();
 
         unit1.lock().unwrap().start().unwrap();
-        assert_eq!(unit1.lock().unwrap().is_running(), true);
+        assert_eq!(unit1.lock().unwrap().test_running(), true);
         assert_eq!(unit2.lock().unwrap().can_start().0, true);
     }
 
@@ -320,7 +344,7 @@ mod tests {
     fn cannot_start_when_dependent_unit_is_not_running() {
         let (unit1, unit2) = build_unitrefs();
 
-        assert_eq!(unit1.lock().unwrap().is_running(), false);
+        assert_eq!(unit1.lock().unwrap().test_running(), false);
         assert_eq!(unit2.lock().unwrap().can_start().0, false);
     }
 
@@ -332,7 +356,7 @@ mod tests {
         unit2.lock().unwrap().start().unwrap();
         unit1.lock().unwrap().stop().unwrap();
 
-        assert_eq!(unit1.lock().unwrap().is_running(), false);
+        assert_eq!(unit1.lock().unwrap().test_running(), false);
         assert_eq!(unit2.lock().unwrap().can_stop().0, true);
     }
 
@@ -341,7 +365,7 @@ mod tests {
         let (unit1, unit2) = build_unitrefs();
 
         unit1.lock().unwrap().start().unwrap();
-        assert_eq!(unit1.lock().unwrap().is_running(), true);
+        assert_eq!(unit1.lock().unwrap().test_running(), true);
         assert_eq!(unit2.lock().unwrap().can_stop().0, false);
     }
 }

@@ -9,7 +9,7 @@ const LOG_TAG: &str = "[unit::Manager]";
 
 pub struct Manager {
     units: Vec<UnitRef>,
-    pub stop_requested: Arc<Mutex<bool>>,
+    stop_requested: Arc<Mutex<bool>>,
 }
 
 
@@ -28,6 +28,14 @@ impl Manager {
     pub fn add_unit(&mut self, unit: UnitRef) {
         println!("{} Adding unit {:?}", LOG_TAG, unit.lock().unwrap());
         self.units.push(unit);
+    }
+
+    pub fn units(&self) -> &Vec<UnitRef> {
+        &self.units
+    }
+
+    pub fn stop_requested(&self) -> &Arc<Mutex<bool>> {
+        &self.stop_requested
     }
 
     /// Set should_stop flag to true
@@ -95,8 +103,8 @@ impl Manager {
     pub fn all_units_running(&self) -> Result<bool, String> {
         for unit in &self.units {
             match unit.lock() {
-                Ok(unit) => {
-                    if !unit.is_running() {
+                Ok(mut unit) => {
+                    if !unit.test_running() {
                         return Ok(false);
                     }
                 }
@@ -114,8 +122,8 @@ impl Manager {
     pub fn all_units_stopped(&self) -> Result<bool, String> {
         for unit in &self.units {
             match unit.lock() {
-                Ok(unit) => {
-                    if unit.is_running() {
+                Ok(mut unit) => {
+                    if unit.test_running() {
                         return Ok(false);
                     }
                 }
@@ -207,8 +215,8 @@ mod tests {
         assert_eq!(manager.units.len(), 2);
 
         manager.start_all();
-        assert_eq!(unit1.lock().unwrap().is_running(), true);
-        assert_eq!(unit2.lock().unwrap().is_running(), true);
+        assert_eq!(unit1.lock().unwrap().test_running(), true);
+        assert_eq!(unit2.lock().unwrap().test_running(), true);
     }
 
     #[test]
@@ -235,12 +243,12 @@ mod tests {
         assert_eq!(manager.units.len(), 2);
 
         manager.start_all();
-        assert_eq!(unit1.lock().unwrap().is_running(), true);
-        assert_eq!(unit2.lock().unwrap().is_running(), true);
+        assert_eq!(unit1.lock().unwrap().test_running(), true);
+        assert_eq!(unit2.lock().unwrap().test_running(), true);
 
         manager.stop_all();
-        assert_eq!(unit1.lock().unwrap().is_running(), false);
-        assert_eq!(unit2.lock().unwrap().is_running(), false);
+        assert_eq!(unit1.lock().unwrap().test_running(), false);
+        assert_eq!(unit2.lock().unwrap().test_running(), false);
     }
 
     #[test]
