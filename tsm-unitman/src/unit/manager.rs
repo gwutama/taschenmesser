@@ -4,6 +4,8 @@ use crate::unit::unit::{Unit, UnitRef, RestartPolicy};
 
 pub type ManagerRef = Arc<Mutex<Manager>>;
 
+const LOG_TAG: &str = "[unit::Manager]";
+
 
 pub struct Manager {
     units: Vec<UnitRef>,
@@ -19,13 +21,18 @@ impl Manager {
         }
     }
 
+    pub fn new_ref() -> ManagerRef {
+        Arc::new(Mutex::new(Manager::new()))
+    }
+
     pub fn add_unit(&mut self, unit: UnitRef) {
+        println!("{} Adding unit {:?}", LOG_TAG, unit.lock().unwrap());
         self.units.push(unit);
     }
 
     /// Set should_stop flag to true
     /// This will stop the thread that is started by start_all_thread()
-    pub fn stop_request(&mut self) {
+    pub fn request_stop(&mut self) {
         let mut should_stop = self.stop_requested.lock().unwrap();
         *should_stop = true;
     }
@@ -47,15 +54,15 @@ impl Manager {
                 Ok(mut unit) => {
                     match unit.start() {
                         Ok(_) => {
-                            println!("Started unit {}", unit.name());
+                            println!("{} Started unit {}", LOG_TAG, unit.name());
                         }
                         Err(e) => {
-                            println!("Error starting unit {}: {}", unit.name(), e);
+                            println!("{} Error starting unit {}: {}", LOG_TAG, unit.name(), e);
                         }
                     }
                 }
                 Err(e) => {
-                    println!("Error acquiring lock while starting unit: {}", e);
+                    println!("{} Error acquiring lock while starting unit: {}", LOG_TAG, e);
                 }
             }
         }
@@ -69,15 +76,15 @@ impl Manager {
                 Ok(mut unit) => {
                     match unit.stop() {
                         Ok(_) => {
-                            println!("Stopped unit {}", unit.name());
+                            println!("{} Stopped unit {}", LOG_TAG, unit.name());
                         }
                         Err(e) => {
-                            println!("Error stopping unit {}: {}", unit.name(), e);
+                            println!("{} Error stopping unit {}: {}", LOG_TAG, unit.name(), e);
                         }
                     }
                 }
                 Err(e) => {
-                    println!("Error acquiring lock while stopping unit: {}", e);
+                    println!("{} Error acquiring lock while stopping unit: {}", LOG_TAG, e);
                 }
             }
         }
@@ -174,7 +181,7 @@ mod tests {
         let mut manager = Manager::new();
         assert_eq!(*manager.stop_requested.lock().unwrap(), false);
 
-        manager.stop_request();
+        manager.request_stop();
         assert_eq!(*manager.stop_requested.lock().unwrap(), true);
     }
 
@@ -183,7 +190,7 @@ mod tests {
         let mut manager = Manager::new();
         assert_eq!(*manager.stop_requested.lock().unwrap(), false);
 
-        manager.stop_request();
+        manager.request_stop();
         assert_eq!(*manager.stop_requested.lock().unwrap(), true);
 
         manager.reset_stop_request();

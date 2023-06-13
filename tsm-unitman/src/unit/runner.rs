@@ -3,9 +3,12 @@ use std::thread::{sleep, spawn};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use crate::unit::manager::{Manager, ManagerRef};
+use crate::unit::unit::{Unit, UnitRef, RestartPolicy};
 
 
 pub struct Runner {}
+
+const LOG_TAG: &str = "[unit::Runner]";
 
 
 impl Runner {
@@ -13,8 +16,11 @@ impl Runner {
     /// The thread can be stopped by setting the should_stop flag to true.
     pub fn run_threaded(manager: ManagerRef) -> JoinHandle<()> {
         let thread_handle = spawn(move || {
+            println!("{} Starting thread", LOG_TAG);
+
             loop {
-                if Self::test_should_stop(manager.clone()) {
+                if Self::test_stop_request(manager.clone()) {
+                    println!("{} Stop requested", LOG_TAG);
                     break;
                 }
 
@@ -23,12 +29,13 @@ impl Runner {
             }
 
             Self::cleanup_units(manager.clone());
+            Self::reset_stop_request(manager.clone());
         });
 
         return thread_handle;
     }
 
-    fn test_should_stop(manager: ManagerRef) -> bool {
+    fn test_stop_request(manager: ManagerRef) -> bool {
         let manager_lock = manager.lock();
 
         return match manager_lock {
@@ -39,14 +46,27 @@ impl Runner {
                         *should_stop
                     }
                     Err(e) => {
-                        println!("Error acquiring lock while testing should_stop: {}", e);
+                        println!("{} Error acquiring lock while testing stop_request: {}", LOG_TAG, e);
                         false
                     }
                 }
             }
             Err(e) => {
-                println!("Error acquiring lock while testing should_stop: {}", e);
+                println!("{} Error acquiring lock while testing stop_request: {}", LOG_TAG, e);
                 false
+            }
+        }
+    }
+
+    fn reset_stop_request(manager: ManagerRef) {
+        let manager_lock = manager.lock();
+
+        match manager_lock {
+            Ok(mut manager) => {
+                manager.reset_stop_request();
+            }
+            Err(e) => {
+                println!("{} Error acquiring lock while resetting stop_request: {}", LOG_TAG, e);
             }
         }
     }
@@ -58,19 +78,17 @@ impl Runner {
             Ok(mut manager) => {
                 match manager.all_units_running() {
                     Ok(true) => {
-                        println!("All units are running");
                     }
                     Ok(false) => {
-                        println!("Not all units are running");
                         manager.start_all();
                     }
                     Err(e) => {
-                        println!("Error checking if all units are running: {}", e);
+                        println!("{} Error checking if all units are running: {}", LOG_TAG, e);
                     }
                 }
             }
             Err(e) => {
-                println!("Error acquiring lock while starting units: {}", e);
+                println!("{} Error acquiring lock while starting units: {}", LOG_TAG, e);
             }
         }
     }
@@ -81,39 +99,93 @@ impl Runner {
             Ok(mut manager) => {
                 match manager.all_units_stopped() {
                     Ok(true) => {
-                        println!("All units are stopped");
+                        println!("{} All units are stopped", LOG_TAG);
                     }
                     Ok(false) => {
                         Self::wait_stop_all_units(&mut manager);
                     }
                     Err(e) => {
-                        println!("Error checking if all units are stopped: {}", e);
+                        println!("{} Error checking if all units are stopped: {}", LOG_TAG, e);
                     }
                 }
             }
             Err(e) => {
-                println!("Error acquiring lock while cleaning up units: {}", e);
+                println!("{} Error acquiring lock while cleaning up units: {}", LOG_TAG, e);
             }
         }
     }
 
     fn wait_stop_all_units(manager: &mut MutexGuard<Manager>) {
-        println!("Stopping units");
+        println!("{} Stopping units", LOG_TAG);
 
         loop {
             match manager.all_units_stopped() {
                 Ok(true) => {
-                    println!("All units are stopped");
+                    println!("{} All units are stopped", LOG_TAG);
                     break;
                 },
                 Ok(false) => {
                     manager.stop_all()
                 },
                 Err(e) => {
-                    println!("Error checking if all units are stopped: {}", e);
+                    println!("{} Error checking if all units are stopped: {}", LOG_TAG, e);
                     break;
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn build_unitrefs() -> Vec<UnitRef> {
+        let unit1 = Unit::new_ref(
+            String::from("test1"),
+            String::from("sleep"),
+            vec![String::from("5")],
+            vec![],
+            RestartPolicy::Always,
+            true,
+        );
+
+        let unit2 = Unit::new_ref(
+            String::from("test2"),
+            String::from("sleep"),
+            vec![String::from("5")],
+            vec![unit1.clone()],
+            RestartPolicy::Never,
+            true,
+        );
+
+        let unit3 = Unit::new_ref(
+            String::from("test3"),
+            String::from("sleep"),
+            vec![String::from("5")],
+            vec![unit1.clone()],
+            RestartPolicy::Never,
+            true,
+        );
+
+        return vec![unit1, unit2, unit3];
+    }
+
+    #[test]
+    fn run_threaded_should_work() {
+        let manager = Manager::new_ref();
+
+        let mut units = build_unitrefs();
+        units.reverse();
+
+        for unit in units {
+            manager.lock().unwrap().add_unit(unit);
+        }
+
+        let thread_handle = Runner::run_threaded(manager.clone());
+        sleep(Duration::from_millis(1000));
+        manager.lock().unwrap().request_stop();
+
+        thread_handle.join().unwrap();
     }
 }

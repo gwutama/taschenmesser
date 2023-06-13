@@ -5,6 +5,8 @@ use std::sync::{Arc, Mutex};
 
 pub type UnitRef = Arc<Mutex<Unit>>;
 
+const LOG_TAG: &str = "[unit::Unit]";
+
 
 #[derive(Debug, PartialEq)]
 pub enum RestartPolicy {
@@ -13,6 +15,7 @@ pub enum RestartPolicy {
 }
 
 
+#[derive(Debug)]
 pub struct Unit {
     name: String,
     executable: String,
@@ -89,9 +92,10 @@ impl Unit {
 
     /// Starts the child process
     pub fn start(&mut self) -> Result<bool, String> {
-        // ignore if unit is running, i.e. child is not None
-        if self.is_running() {
-            return Err(format!("Unit {} is already running", self.name));
+        let (can_start, reason) = self.can_start();
+
+        if !can_start {
+            return Err(format!("{} Cannot start unit {}: {}", LOG_TAG, self.name, reason));
         }
 
         let mut command: Command = Command::new(&self.executable);
@@ -119,7 +123,7 @@ impl Unit {
             }
             Err(error) => {
                 self.child = None;
-                return Err(format!("Unit {} failed to start: {}", self.name, error));
+                return Err(format!("{} Unit {} failed to start: {}", LOG_TAG, self.name, error));
             }
         }
 
@@ -128,6 +132,12 @@ impl Unit {
 
     /// Stops the child process
     pub fn stop(&mut self) -> Result<bool, String> {
+        let (can_stop, reason) = self.can_stop();
+
+        if !can_stop {
+            return Err(format!("{} Cannot stop unit {}: {}", LOG_TAG, self.name, reason));
+        }
+
         match self.child {
             Some(ref mut child) => {
                 match child.kill() {
@@ -135,12 +145,12 @@ impl Unit {
                         self.child = None;
                     }
                     Err(error) => {
-                        return Err(format!("Unit {} failed to stop: {}", self.name, error));
+                        return Err(format!("{} Unit {} failed to stop: {}", LOG_TAG, self.name, error));
                     }
                 }
             }
             None => {
-                return Err(format!("Cannot stop unit {} because it is NOT running", self.name));
+                return Err(format!("{} Cannot stop unit {} because it is NOT running", LOG_TAG, self.name));
             }
         }
 
@@ -148,37 +158,45 @@ impl Unit {
     }
 
     /// A unit is allowed to start if it is enabled and all dependencies are running
-    fn can_start(&self) -> Result<bool, String> {
+    fn can_start(&self) -> (bool, String) {
         if !self.enabled {
-            return Err(format!("Unit {} is not enabled", self.name));
+            return (false, String::from("Unit is not enabled"));
+        }
+
+        // ignore if unit is running, i.e. child is not None
+        if self.is_running() {
+            return (false, String::from("Unit is already running"));
         }
 
         for dependency in &self.dependencies {
             let unit = dependency.lock().unwrap();
             if !unit.is_running() {
-                return Err(format!("Cannot start unit {} because its dependency unit {} is NOT running",
-                                   self.name, unit.name));
+                return (false, format!("Unit depends on {} but it is not running", unit.name));
             }
         }
 
-        return Ok(true);
+        return (true, String::from(""));
     }
 
     /// A unit is allowed to start if it is enabled and all dependencies are stopped
-    fn can_stop(&self) -> Result<bool, String> {
+    fn can_stop(&self) -> (bool, String) {
         if !self.enabled {
-            return Err(format!("Cannot stop unit {} because it is disabled", self.name));
+            return (false, String::from("Unit is not enabled"));
+        }
+
+        // ignore if unit is stopped, i.e. child is None
+        if !self.is_running() {
+            return (false, String::from("Unit is already stopped"));
         }
 
         for dependency in &self.dependencies {
             let unit = dependency.lock().unwrap();
             if unit.is_running() {
-                return Err(format!("Cannot stop unit {} because its dependency unit {} is running",
-                                   self.name, unit.name));
+                return (false, format!("Unit depends on {} but it is still running", unit.name));
             }
         }
 
-        return Ok(true);
+        return (true, String::from(""));
     }
 }
 
@@ -295,7 +313,7 @@ mod tests {
 
         unit1.lock().unwrap().start().unwrap();
         assert_eq!(unit1.lock().unwrap().is_running(), true);
-        assert_eq!(unit2.lock().unwrap().can_start().unwrap(), true);
+        assert_eq!(unit2.lock().unwrap().can_start().0, true);
     }
 
     #[test]
@@ -303,15 +321,19 @@ mod tests {
         let (unit1, unit2) = build_unitrefs();
 
         assert_eq!(unit1.lock().unwrap().is_running(), false);
-        assert!(unit2.lock().unwrap().can_start().is_err());
+        assert_eq!(unit2.lock().unwrap().can_start().0, false);
     }
 
     #[test]
     fn can_stop_when_dependent_unit_is_not_running() {
         let (unit1, unit2) = build_unitrefs();
 
+        unit1.lock().unwrap().start().unwrap();
+        unit2.lock().unwrap().start().unwrap();
+        unit1.lock().unwrap().stop().unwrap();
+
         assert_eq!(unit1.lock().unwrap().is_running(), false);
-        assert_eq!(unit2.lock().unwrap().can_stop().unwrap(), true);
+        assert_eq!(unit2.lock().unwrap().can_stop().0, true);
     }
 
     #[test]
@@ -320,6 +342,6 @@ mod tests {
 
         unit1.lock().unwrap().start().unwrap();
         assert_eq!(unit1.lock().unwrap().is_running(), true);
-        assert!(unit2.lock().unwrap().can_stop().is_err());
+        assert_eq!(unit2.lock().unwrap().can_stop().0, false);
     }
 }
