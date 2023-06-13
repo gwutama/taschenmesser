@@ -3,24 +3,24 @@ log_level = "debug"
 
 [watchdog]
 enabled = true
-interval_s = 10
+timeout_s = 10
 
-[unit]
-
-[unit.foo]
+[[units]]
+name = "foo"
 executable = "ls"
 arguments = [ "-l", "-a" ]
 dependencies = []
 restart_policy = "always" # implies that watchdog events must be sent by the executable
-uid = "" # default. If empty, the user of the current process is used
-gid = "" # default. If empty, the group of the current process is used
+user = "" # default. If empty, the user of the current process is used
+group = "" # default. If empty, the group of the current process is used
 enabled = true # default
 
-[unit.bar]
+[[units]]
+name = "bar"
 executable = "ps"
 arguments = [ "-aux" ]
 dependencies = [ "foo" ]
 restart_policy = "never" # run once, no watchdog events are expected
-uid = "" # default. If empty, the user of the current process is used
-gid = "" # default. If empty, the group of the current process is used
+user = "" # default. If empty, the user of the current process is used
+group = "" # default. If empty, the group of the current process is used
 enabled = true # default

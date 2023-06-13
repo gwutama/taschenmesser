@@ -197,14 +197,16 @@ impl Runner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use users::{get_current_uid, get_current_gid};
 
     fn build_unitrefs() -> Vec<UnitRef> {
         let unit1 = Unit::new_ref(
             String::from("test1"),
             String::from("sleep"),
             vec![String::from("5")],
-            vec![],
             RestartPolicy::Always,
+            get_current_uid(),
+            get_current_gid(),
             true,
         );
 
@@ -212,19 +214,25 @@ mod tests {
             String::from("test2"),
             String::from("sleep"),
             vec![String::from("5")],
-            vec![unit1.clone()],
             RestartPolicy::Never,
+            get_current_uid(),
+            get_current_gid(),
             true,
         );
+
+        unit2.lock().unwrap().add_dependency(unit1.clone());
 
         let unit3 = Unit::new_ref(
             String::from("test3"),
             String::from("sleep"),
             vec![String::from("5")],
-            vec![unit1.clone()],
             RestartPolicy::Never,
+            get_current_uid(),
+            get_current_gid(),
             true,
         );
+
+        unit3.lock().unwrap().add_dependency(unit1.clone());
 
         return vec![unit1, unit2, unit3];
     }

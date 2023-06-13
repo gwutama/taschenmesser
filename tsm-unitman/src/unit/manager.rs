@@ -141,14 +141,16 @@ impl Manager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use users::{get_current_uid, get_current_gid};
 
     fn build_unitrefs() -> (UnitRef, UnitRef) {
         let unit1 = Unit::new_ref(
             String::from("test1"),
             String::from("sleep"),
             vec![String::from("1")],
-            vec![],
             RestartPolicy::Always,
+            get_current_uid(),
+            get_current_gid(),
             true,
         );
 
@@ -156,10 +158,13 @@ mod tests {
             String::from("test2"),
             String::from("sleep"),
             vec![String::from("1")],
-            vec![unit1.clone()],
             RestartPolicy::Never,
+            get_current_uid(),
+            get_current_gid(),
             true,
         );
+
+        unit2.lock().unwrap().add_dependency(unit1.clone());
 
         return (unit1, unit2);
     }

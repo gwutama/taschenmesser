@@ -1,7 +1,9 @@
+use std::str::FromStr;
 use std::process::{Command, Child};
 use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
 use sysinfo::{System, SystemExt, PidExt, Pid, ProcessRefreshKind};
+use serde::Deserialize;
 
 
 pub type UnitRef = Arc<Mutex<Unit>>;
@@ -9,10 +11,40 @@ pub type UnitRef = Arc<Mutex<Unit>>;
 const LOG_TAG: &str = "[unit::Unit]";
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum RestartPolicy {
     Always,
     Never,
+}
+
+
+impl<'de> Deserialize<'de> for RestartPolicy {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        RestartPolicy::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+
+impl FromStr for RestartPolicy {
+    type Err = String;
+
+    fn from_str(policy: &str) -> Result<Self, Self::Err> {
+        match policy {
+            "always" => {
+                Ok(RestartPolicy::Always)
+            }
+            "never" => {
+                Ok(RestartPolicy::Never)
+            }
+            _ => {
+                Err(format!("{} Invalid restart policy: {}", LOG_TAG, policy))
+            }
+        }
+    }
 }
 
 
@@ -23,8 +55,8 @@ pub struct Unit {
     arguments: Vec<String>,
     dependencies: Vec<UnitRef>,
     restart_policy: RestartPolicy,
-    uid: Option<u32>,
-    gid: Option<u32>,
+    uid: u32,
+    gid: u32,
     enabled: bool,
     child: Option<Box<Child>>,
     system_info: System,
@@ -36,18 +68,19 @@ impl Unit {
         name: String,
         executable: String,
         arguments: Vec<String>,
-        dependencies: Vec<UnitRef>,
         restart_policy: RestartPolicy,
+        uid: u32,
+        gid: u32,
         enabled: bool,
     ) -> Unit {
         Unit {
             name,
             executable,
             arguments,
-            dependencies,
+            dependencies: Vec::new(),
             restart_policy,
-            uid: None,
-            gid: None,
+            uid,
+            gid,
             enabled,
             child: None,
             system_info: sysinfo::System::new(),
@@ -58,18 +91,28 @@ impl Unit {
         name: String,
         executable: String,
         arguments: Vec<String>,
-        dependencies: Vec<UnitRef>,
         restart_policy: RestartPolicy,
+        uid: u32,
+        gid: u32,
         enabled: bool,
     ) -> UnitRef {
         Arc::new(Mutex::new(Unit::new(
             name,
             executable,
             arguments,
-            dependencies,
             restart_policy,
+            uid,
+            gid,
             enabled,
         )))
+    }
+
+    pub fn add_dependency(&mut self, unit: UnitRef) {
+        self.dependencies.push(unit);
+    }
+
+    pub fn dependencies(&self) -> &Vec<UnitRef> {
+        return &self.dependencies;
     }
 
     pub fn name(&self) -> &String {
@@ -122,24 +165,11 @@ impl Unit {
             return Err(format!("{} Cannot start unit {}: {}", LOG_TAG, self.name, reason));
         }
 
-        let mut command: Command = Command::new(&self.executable);
-        command.args(&self.arguments);
-
-        match self.uid {
-            Some(uid) => {
-                command.uid(uid);
-            }
-            None => {}
-        }
-
-        match self.gid {
-            Some(gid) => {
-                command.gid(gid);
-            }
-            None => {}
-        }
-
-        let child = command.spawn();
+        let child = Command::new(&self.executable)
+            .args(&self.arguments)
+            .uid(self.uid)
+            .gid(self.gid)
+            .spawn();
 
         match child {
             Ok(child) => {
@@ -228,14 +258,16 @@ impl Unit {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use users::{get_current_uid, get_current_gid};
 
     fn build_unit() -> Unit {
         return Unit::new(
             String::from("test"),
             String::from("sleep"),
             vec![String::from("1")],
-            vec![],
             RestartPolicy::Never,
+            get_current_uid(),
+            get_current_gid(),
             true,
         );
     }
@@ -245,8 +277,9 @@ mod tests {
             String::from("test1"),
             String::from("ls"),
             vec![],
-            vec![],
             RestartPolicy::Always,
+            get_current_uid(),
+            get_current_gid(),
             true,
         );
 
@@ -254,10 +287,13 @@ mod tests {
             String::from("test2"),
             String::from("ls"),
             vec![],
-            vec![unit1.clone()],
             RestartPolicy::Never,
+            get_current_uid(),
+            get_current_gid(),
             true,
         );
+
+        unit2.lock().unwrap().add_dependency(unit1.clone());
 
         return (unit1, unit2);
     }
