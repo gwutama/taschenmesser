@@ -3,8 +3,8 @@ use std::thread::{sleep, spawn};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use log::{debug, error, warn};
-use crate::unit::manager::{Manager, ManagerRef};
-use crate::unit::restart_policy::RestartPolicy;
+
+use crate::unit::{Manager, ManagerRef, RestartPolicy};
 
 
 pub struct Runner {}

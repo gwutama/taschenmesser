@@ -2,14 +2,8 @@ use std::process::exit;
 use argparse::{ArgumentParser, Store};
 use log::error;
 
+mod config;
 mod unit;
-mod configuration;
-mod log_level;
-
-use configuration::Configuration;
-use log_level::LogLevel;
-use unit::manager::{Manager, ManagerRef};
-use unit::runner::Runner;
 
 
 struct CommandLineParameters {
@@ -33,8 +27,8 @@ fn parse_args_or_exit() -> CommandLineParameters {
 }
 
 
-fn init_config_or_exit(config_file: String) -> Configuration {
-    match Configuration::from_file(config_file) {
+fn init_config_or_exit(config_file: String) -> config::Configuration {
+    match config::Configuration::from_file(config_file) {
         Ok(configuration) => {
             configuration
         },
@@ -46,8 +40,8 @@ fn init_config_or_exit(config_file: String) -> Configuration {
 }
 
 
-fn init_logger(configuration: &Configuration) {
-    let mut log_level_to_use = LogLevel::Info;
+fn init_logger(configuration: &config::Configuration) {
+    let mut log_level_to_use = config::LogLevel::Info;
 
     match &configuration.application.log_level {
         Some(level) => {
@@ -61,8 +55,8 @@ fn init_logger(configuration: &Configuration) {
 }
 
 
-fn init_unit_manager_or_exit(configuration: &Configuration) -> ManagerRef {
-    let manager = Manager::new_ref();
+fn init_unit_manager_or_exit(configuration: &config::Configuration) -> unit::ManagerRef {
+    let manager = unit::Manager::new_ref();
     let units = configuration.build_units();
 
     match manager.lock() {
@@ -99,5 +93,5 @@ fn main() {
     let configuration = init_config_or_exit(params.config_file);
     init_logger(&configuration);
     let manager = init_unit_manager_or_exit(&configuration);
-    Runner::run(manager.clone());
+    unit::Runner::run(manager.clone());
 }

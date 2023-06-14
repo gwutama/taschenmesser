@@ -2,7 +2,8 @@ use std::process::{Child, Command};
 use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
 use sysinfo::{Pid, PidExt, ProcessRefreshKind, System, SystemExt};
-use crate::unit::restart_policy::RestartPolicy;
+
+use crate::unit::RestartPolicy;
 
 
 pub type UnitRef = Arc<Mutex<Unit>>;

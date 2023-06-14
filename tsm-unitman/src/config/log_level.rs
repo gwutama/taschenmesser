@@ -2,6 +2,7 @@ use std::str::FromStr;
 use serde::Deserialize;
 use serde::de::Error;
 
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum LogLevel {
     Debug,

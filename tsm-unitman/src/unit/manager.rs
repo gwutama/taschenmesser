@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
-use crate::unit::unit::UnitRef;
 use log::{debug, error, warn};
+
+use crate::unit::UnitRef;
 
 
 pub type ManagerRef = Arc<Mutex<Manager>>;
