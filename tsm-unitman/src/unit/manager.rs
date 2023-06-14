@@ -1,10 +1,9 @@
 use std::sync::{Arc, Mutex};
-use crate::unit::unit::{Unit, UnitRef, RestartPolicy};
+use crate::unit::unit::UnitRef;
+use log::{warn, error, debug};
 
 
 pub type ManagerRef = Arc<Mutex<Manager>>;
-
-const LOG_TAG: &str = "[unit::Manager]";
 
 
 pub struct Manager {
@@ -26,7 +25,7 @@ impl Manager {
     }
 
     pub fn add_unit(&mut self, unit: UnitRef) {
-        println!("{} Adding unit {:?}", LOG_TAG, unit.lock().unwrap());
+        debug!("Adding unit {:?}", unit.lock().unwrap());
         self.units.push(unit);
     }
 
@@ -62,15 +61,15 @@ impl Manager {
                 Ok(mut unit) => {
                     match unit.start() {
                         Ok(_) => {
-                            println!("{} Started unit {}", LOG_TAG, unit.name());
+                            debug!("Started unit {}", unit.name());
                         }
                         Err(e) => {
-                            println!("{} Error starting unit {}: {}", LOG_TAG, unit.name(), e);
+                            warn!("Error starting unit {}: {}", unit.name(), e);
                         }
                     }
                 }
                 Err(e) => {
-                    println!("{} Error acquiring lock while starting unit: {}", LOG_TAG, e);
+                    error!("Error acquiring lock while starting unit: {}", e);
                 }
             }
         }
@@ -84,15 +83,15 @@ impl Manager {
                 Ok(mut unit) => {
                     match unit.stop() {
                         Ok(_) => {
-                            println!("{} Stopped unit {}", LOG_TAG, unit.name());
+                            debug!("Stopped unit {}", unit.name());
                         }
                         Err(e) => {
-                            println!("{} Error stopping unit {}: {}", LOG_TAG, unit.name(), e);
+                            warn!("Error stopping unit {}: {}", unit.name(), e);
                         }
                     }
                 }
                 Err(e) => {
-                    println!("{} Error acquiring lock while stopping unit: {}", LOG_TAG, e);
+                    error!("Error acquiring lock while stopping unit: {}", e);
                 }
             }
         }

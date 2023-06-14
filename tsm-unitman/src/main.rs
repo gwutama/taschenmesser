@@ -1,6 +1,6 @@
 use std::process::exit;
-use argparse::{ArgumentParser, StoreTrue, Store};
-use ctrlc::set_handler;
+use argparse::{ArgumentParser, Store};
+use log::{error};
 
 mod unit;
 mod configuration;
@@ -37,14 +37,21 @@ fn init_config_or_exit(config_file: String) -> Configuration {
             configuration
         },
         Err(e) => {
-            println!("Error: {}", e);
+            error!("Error: {}", e);
             exit(10);
         }
     }
 }
 
 
-fn init_unit_manager_or_exit(configuration: Configuration) -> ManagerRef {
+fn init_logger(configuration: &Configuration) {
+    let level = &configuration.application.log_level;
+    let env = env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, level);
+    env_logger::init_from_env(env);
+}
+
+
+fn init_unit_manager_or_exit(configuration: &Configuration) -> ManagerRef {
     let manager = Manager::new_ref();
     let units = configuration.build_units();
 
@@ -55,7 +62,7 @@ fn init_unit_manager_or_exit(configuration: Configuration) -> ManagerRef {
             }
         },
         Err(e) => {
-            println!("Error acquiring lock: {}", e);
+            error!("Error acquiring lock: {}", e);
             exit(20);
         }
     }
@@ -67,7 +74,7 @@ fn init_unit_manager_or_exit(configuration: Configuration) -> ManagerRef {
                 manager.request_stop();
             },
             Err(e) => {
-                println!("Error acquiring lock: {}", e);
+                error!("Error acquiring lock: {}", e);
                 exit(20);
             }
         }
@@ -80,6 +87,7 @@ fn init_unit_manager_or_exit(configuration: Configuration) -> ManagerRef {
 fn main() {
     let params = parse_args_or_exit();
     let configuration = init_config_or_exit(params.config_file);
-    let manager = init_unit_manager_or_exit(configuration);
+    init_logger(&configuration);
+    let manager = init_unit_manager_or_exit(&configuration);
     Runner::run(manager.clone());
 }

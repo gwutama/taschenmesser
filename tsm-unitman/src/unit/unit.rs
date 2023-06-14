@@ -8,8 +8,6 @@ use serde::Deserialize;
 
 pub type UnitRef = Arc<Mutex<Unit>>;
 
-const LOG_TAG: &str = "[unit::Unit]";
-
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum RestartPolicy {
@@ -41,7 +39,7 @@ impl FromStr for RestartPolicy {
                 Ok(RestartPolicy::Never)
             }
             _ => {
-                Err(format!("{} Invalid restart policy: {}", LOG_TAG, policy))
+                Err(format!("Invalid restart policy: {}", policy))
             }
         }
     }
@@ -83,7 +81,7 @@ impl Unit {
             gid,
             enabled,
             child: None,
-            system_info: sysinfo::System::new(),
+            system_info: System::new(),
         }
     }
 
@@ -162,7 +160,7 @@ impl Unit {
         let (can_start, reason) = self.can_start();
 
         if !can_start {
-            return Err(format!("{} Cannot start unit {}: {}", LOG_TAG, self.name, reason));
+            return Err(format!("Cannot start unit {}: {}", self.name, reason));
         }
 
         let child = Command::new(&self.executable)
@@ -177,7 +175,7 @@ impl Unit {
             }
             Err(error) => {
                 self.child = None;
-                return Err(format!("{} Unit {} failed to start: {}", LOG_TAG, self.name, error));
+                return Err(format!("Unit {} failed to start: {}", self.name, error));
             }
         }
 
@@ -189,7 +187,7 @@ impl Unit {
         let (can_stop, reason) = self.can_stop();
 
         if !can_stop {
-            return Err(format!("{} Cannot stop unit {}: {}", LOG_TAG, self.name, reason));
+            return Err(format!("Cannot stop unit {}: {}", self.name, reason));
         }
 
         match self.child {
@@ -199,12 +197,12 @@ impl Unit {
                         self.child = None;
                     }
                     Err(error) => {
-                        return Err(format!("{} Unit {} failed to stop: {}", LOG_TAG, self.name, error));
+                        return Err(format!("Unit {} failed to stop: {}", self.name, error));
                     }
                 }
             }
             None => {
-                return Err(format!("{} Cannot stop unit {} because it is NOT running", LOG_TAG, self.name));
+                return Err(format!("Cannot stop unit {} because it is NOT running", self.name));
             }
         }
 

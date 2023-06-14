@@ -3,14 +3,12 @@ use std::fs;
 use serde::Deserialize;
 use crate::unit::unit::{RestartPolicy, Unit, UnitRef};
 use users::{get_current_uid, get_current_gid, get_user_by_name, get_group_by_name};
-
-
-const LOG_TAG: &str = "[Configuration]";
+use log::{warn, error};
 
 
 #[derive(Deserialize, Debug)]
 pub struct ApplicationConfiguration {
-    log_level: String,
+    pub log_level: String,
 }
 
 
@@ -68,7 +66,7 @@ impl UnitConfiguration {
 
 #[derive(Deserialize, Debug)]
 pub struct Configuration {
-    application: ApplicationConfiguration,
+    pub application: ApplicationConfiguration,
     watchdog: WatchdogConfiguration,
     units: Vec<UnitConfiguration>,
 }
@@ -81,7 +79,7 @@ impl Configuration {
                 Configuration::from_string(content)
             },
             Err(error) => {
-                Err(format!("{} Error reading configuration file: {}", LOG_TAG, error))
+                Err(format!("Error reading configuration file: {}", error))
             }
         }
     }
@@ -92,7 +90,7 @@ impl Configuration {
                 Ok(configuration)
             },
             Err(error) => {
-                Err(format!("{} Error parsing configuration file: {}", LOG_TAG, error))
+                Err(format!("Error parsing configuration file: {}", error))
             }
         }
     }
@@ -114,7 +112,7 @@ impl Configuration {
                     unit_map.insert(unit.name().clone(), unit_ref.clone());
                 },
                 Err(e) => {
-                    println!("{} Error acquiring lock while building unit ref: {}", LOG_TAG, e);
+                    error!("Error acquiring lock while building unit ref: {}", e);
                 }
             };
         }
@@ -123,7 +121,7 @@ impl Configuration {
             let unit_ref = match unit_map.get(&unit_configuration.name) {
                 Some(unit_ref) => unit_ref,
                 None => {
-                    println!("{} Unit {} not found in unit map", LOG_TAG, unit_configuration.name);
+                    warn!("Unit {} not found in unit map", unit_configuration.name);
                     continue;
                 }
             };
@@ -132,7 +130,7 @@ impl Configuration {
                 let dependency_unit_ref = match unit_map.get(dependency_name) {
                     Some(unit_ref) => unit_ref,
                     None => {
-                        println!("{} Dependency {} not found in unit map", LOG_TAG, dependency_name);
+                        warn!("Dependency {} not found in unit map", dependency_name);
                         continue;
                     }
                 };
@@ -142,7 +140,7 @@ impl Configuration {
                         unit.add_dependency(dependency_unit_ref.clone());
                     },
                     Err(e) => {
-                        println!("{} Error acquiring lock while building dependency for unit: {}", LOG_TAG, e);
+                        error!("Error acquiring lock while building dependency for unit: {}", e);
                     }
                 };
             }

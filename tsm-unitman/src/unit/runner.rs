@@ -2,24 +2,23 @@ use std::sync::MutexGuard;
 use std::thread::{sleep, spawn};
 use std::thread::JoinHandle;
 use std::time::Duration;
+use log::{warn, error, debug};
 use crate::unit::manager::{Manager, ManagerRef};
-use crate::unit::unit::{Unit, UnitRef, RestartPolicy};
+use crate::unit::unit::RestartPolicy;
 
 
 pub struct Runner {}
 
-const LOG_TAG: &str = "[unit::Runner]";
-
 
 impl Runner {
     pub fn run(manager: ManagerRef) {
-        println!("{} Starting units", LOG_TAG);
+        debug!("Starting units");
         Self::startup_units(manager.clone());
 
-        println!("{} Supervising units", LOG_TAG);
+        debug!("Supervising units");
         loop {
             if Self::test_stop_request(manager.clone()) {
-                println!("{} Stop requested", LOG_TAG);
+                debug!("Stop requested");
                 break;
             }
 
@@ -27,7 +26,7 @@ impl Runner {
             sleep(Duration::from_secs(1));
         }
 
-        println!("{} Shutting down units", LOG_TAG);
+        debug!("Shutting down units");
         Self::shutdown_units(manager.clone());
         Self::reset_stop_request(manager.clone());
     }
@@ -35,7 +34,7 @@ impl Runner {
     /// Spawn a thread that executes UnitManager.start_all() within an infinite loop.
     /// The thread can be stopped by setting the should_stop flag to true.
     pub fn run_threaded(manager: ManagerRef) -> JoinHandle<()> {
-        println!("{} Spawning thread", LOG_TAG);
+        debug!("Spawning thread");
 
         let thread_handle = spawn(move || {
             Self::run(manager);
@@ -55,13 +54,13 @@ impl Runner {
                         *should_stop
                     }
                     Err(e) => {
-                        println!("{} Error acquiring lock while testing stop_request: {}", LOG_TAG, e);
+                        error!("Error acquiring lock while testing stop_request: {}", e);
                         false
                     }
                 }
             }
             Err(e) => {
-                println!("{} Error acquiring lock while testing stop_request: {}", LOG_TAG, e);
+                error!("Error acquiring lock while testing stop_request: {}", e);
                 false
             }
         }
@@ -75,7 +74,7 @@ impl Runner {
                 manager.reset_stop_request();
             }
             Err(e) => {
-                println!("{} Error acquiring lock while resetting stop_request: {}", LOG_TAG, e);
+                error!("Error acquiring lock while resetting stop_request: {}", e);
             }
         }
     }
@@ -86,18 +85,18 @@ impl Runner {
             Ok(mut manager) => {
                 match manager.all_units_running() {
                     Ok(true) => {
-                        println!("{} All units are started", LOG_TAG);
+                        debug!("All units are started");
                     }
                     Ok(false) => {
                         Self::wait_start_all_units(&mut manager);
                     }
                     Err(e) => {
-                        println!("{} Error checking if all units are started: {}", LOG_TAG, e);
+                        warn!("Error checking if all units are started: {}", e);
                     }
                 }
             }
             Err(e) => {
-                println!("{} Error acquiring lock while starting up units: {}", LOG_TAG, e);
+                error!("Error acquiring lock while starting up units: {}", e);
             }
         }
     }
@@ -106,14 +105,14 @@ impl Runner {
         loop {
             match manager.all_units_running() {
                 Ok(true) => {
-                    println!("{} All units are started", LOG_TAG);
+                    debug!("All units are started");
                     break;
                 },
                 Ok(false) => {
                     manager.start_all()
                 },
                 Err(e) => {
-                    println!("{} Error checking if all units are started: {}", LOG_TAG, e);
+                    warn!("Error checking if all units are started: {}", e);
                     break;
                 }
             }
@@ -132,27 +131,27 @@ impl Runner {
                     match unit.lock() {
                         Ok(mut unit) => {
                             if *unit.restart_policy() == RestartPolicy::Always && !unit.test_running() {
-                                println!("{} Unit {} is not running, restarting", LOG_TAG, unit.name());
+                                debug!("Unit {} is not running, restarting", unit.name());
                                 let start_result = unit.start();
 
                                 match start_result {
                                     Ok(_) => {
-                                        println!("{} Unit {} restarted", LOG_TAG, unit.name());
+                                        debug!("Unit {} restarted", unit.name());
                                     }
                                     Err(e) => {
-                                        println!("{} Error restarting unit {}: {}", LOG_TAG, unit.name(), e);
+                                        warn!("Error restarting unit {}: {}", unit.name(), e);
                                     }
                                 }
                             }
                         }
                         Err(e) => {
-                            println!("{} Error acquiring lock while watching units: {}", LOG_TAG, e);
+                            error!("Error acquiring lock while watching units: {}", e);
                         }
                     }
                 }
             }
             Err(e) => {
-                println!("{} Error acquiring lock while watching units: {}", LOG_TAG, e);
+                error!("Error acquiring lock while watching units: {}", e);
             }
         }
     }
@@ -163,18 +162,18 @@ impl Runner {
             Ok(mut manager) => {
                 match manager.all_units_stopped() {
                     Ok(true) => {
-                        println!("{} All units are stopped", LOG_TAG);
+                        debug!("All units are stopped");
                     }
                     Ok(false) => {
                         Self::wait_stop_all_units(&mut manager);
                     }
                     Err(e) => {
-                        println!("{} Error checking if all units are stopped: {}", LOG_TAG, e);
+                        warn!("Error checking if all units are stopped: {}", e);
                     }
                 }
             }
             Err(e) => {
-                println!("{} Error acquiring lock while cleaning up units: {}", LOG_TAG, e);
+                error!("Error acquiring lock while cleaning up units: {}", e);
             }
         }
     }
@@ -183,14 +182,14 @@ impl Runner {
         loop {
             match manager.all_units_stopped() {
                 Ok(true) => {
-                    println!("{} All units are stopped", LOG_TAG);
+                    debug!("All units are stopped");
                     break;
                 },
                 Ok(false) => {
                     manager.stop_all()
                 },
                 Err(e) => {
-                    println!("{} Error checking if all units are stopped: {}", LOG_TAG, e);
+                    error!("Error checking if all units are stopped: {}", e);
                     break;
                 }
             }
