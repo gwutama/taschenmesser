@@ -1,26 +1,30 @@
 [application]
-log_level = "debug"
-
-[watchdog]
-enabled = true
-timeout_s = 10
+log_level = "debug" # Optional. Defaults to "info". Possible values: "debug", "info", "warn", "error"
 
 [[units]]
-name = "foo"
-executable = "sleep"
-arguments = [ "10" ]
-dependencies = []
+name = "foo" # Mandatory
+executable = "sleep" # Mandatory
+arguments = [ "10" ] # Mandatory. Empty list is allowed.
+dependencies = [] # Mandatory. Empty list is allowed.
 restart_policy = "always" # implies that watchdog events must be sent by the executable
-user = "" # default. If empty, the user of the current process is used
-group = "" # default. If empty, the group of the current process is used
+user = "" # Optional. If empty or unset, the user of the current process is used
+group = "" # Optional. If empty or unset, the group of the current process is used
 enabled = true # default
+startup_probe.command = ["ls", "/tmp"] # defaults to empty list
+readiness_probe.command = ["ls", "/tmp"] # defaults to empty list
+liveness_probe.command = ["ls", "/tmp"] # defaults to empty list
+liveness_probe.interval_s = 5 # defaults to 60
 
 [[units]]
-name = "bar"
-executable = "ps"
-arguments = [ "aux" ]
-dependencies = [ "foo" ]
+name = "bar" # Mandatory
+executable = "ps" # Mandatory
+arguments = [ "aux" ] # Mandatory. Empty list is allowed.
+dependencies = [ "foo" ] # Mandatory. Empty list is allowed.
 restart_policy = "never" # run once, no watchdog events are expected
-user = "" # default. If empty, the user of the current process is used
-group = "" # default. If empty, the group of the current process is used
+user = "" # Optional. If empty or unset, the user of the current process is used
+group = "" # Optional. If empty or unset, the group of the current process is used
 enabled = true # default
+startup_probe.command = ["ls", "/tmp"] # defaults to empty list
+readiness_probe.command = ["ls", "/tmp"] # defaults to empty list
+liveness_probe.command = ["ls", "/tmp"] # defaults to empty list
+liveness_probe.interval_s = 5 # defaults to 60

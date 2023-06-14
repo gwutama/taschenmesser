@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 use crate::unit::unit::UnitRef;
-use log::{warn, error, debug};
+use log::{debug, error, warn};
 
 
 pub type ManagerRef = Arc<Mutex<Manager>>;
@@ -140,7 +140,9 @@ impl Manager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use users::{get_current_uid, get_current_gid};
+    use users::{get_current_gid, get_current_uid};
+    use crate::unit::restart_policy::RestartPolicy;
+    use crate::unit::unit::Unit;
 
     fn build_unitrefs() -> (UnitRef, UnitRef) {
         let unit1 = Unit::new_ref(

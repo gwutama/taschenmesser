@@ -1,11 +1,13 @@
 use std::process::exit;
 use argparse::{ArgumentParser, Store};
-use log::{error};
+use log::error;
 
 mod unit;
 mod configuration;
+mod log_level;
 
 use configuration::Configuration;
+use log_level::LogLevel;
 use unit::manager::{Manager, ManagerRef};
 use unit::runner::Runner;
 
@@ -45,8 +47,16 @@ fn init_config_or_exit(config_file: String) -> Configuration {
 
 
 fn init_logger(configuration: &Configuration) {
-    let level = &configuration.application.log_level;
-    let env = env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, level);
+    let mut log_level_to_use = LogLevel::Info;
+
+    match &configuration.application.log_level {
+        Some(level) => {
+            log_level_to_use = level.clone();
+        },
+        None => {}
+    }
+
+    let env = env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, log_level_to_use.to_string());
     env_logger::init_from_env(env);
 }
 

@@ -1,49 +1,11 @@
-use std::str::FromStr;
-use std::process::{Command, Child};
+use std::process::{Child, Command};
 use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
-use sysinfo::{System, SystemExt, PidExt, Pid, ProcessRefreshKind};
-use serde::Deserialize;
+use sysinfo::{Pid, PidExt, ProcessRefreshKind, System, SystemExt};
+use crate::unit::restart_policy::RestartPolicy;
 
 
 pub type UnitRef = Arc<Mutex<Unit>>;
-
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum RestartPolicy {
-    Always,
-    Never,
-}
-
-
-impl<'de> Deserialize<'de> for RestartPolicy {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        RestartPolicy::from_str(&s).map_err(serde::de::Error::custom)
-    }
-}
-
-
-impl FromStr for RestartPolicy {
-    type Err = String;
-
-    fn from_str(policy: &str) -> Result<Self, Self::Err> {
-        match policy {
-            "always" => {
-                Ok(RestartPolicy::Always)
-            }
-            "never" => {
-                Ok(RestartPolicy::Never)
-            }
-            _ => {
-                Err(format!("Invalid restart policy: {}", policy))
-            }
-        }
-    }
-}
 
 
 #[derive(Debug)]
@@ -256,7 +218,7 @@ impl Unit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use users::{get_current_uid, get_current_gid};
+    use users::{get_current_gid, get_current_uid};
 
     fn build_unit() -> Unit {
         return Unit::new(

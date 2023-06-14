@@ -1,21 +1,17 @@
 use std::collections::HashMap;
 use std::fs;
 use serde::Deserialize;
-use crate::unit::unit::{RestartPolicy, Unit, UnitRef};
-use users::{get_current_uid, get_current_gid, get_user_by_name, get_group_by_name};
-use log::{warn, error};
+use log::{error, warn};
+use users::{get_current_gid, get_current_uid, get_group_by_name, get_user_by_name};
+
+use crate::unit::unit::{Unit, UnitRef};
+use crate::log_level::LogLevel;
+use crate::unit::restart_policy::RestartPolicy;
 
 
 #[derive(Deserialize, Debug)]
 pub struct ApplicationConfiguration {
-    pub log_level: String,
-}
-
-
-#[derive(Deserialize, Debug)]
-pub struct WatchdogConfiguration {
-    enabled: bool,
-    timeout_s: u32,
+    pub log_level: Option<LogLevel>,
 }
 
 
@@ -26,8 +22,8 @@ pub struct UnitConfiguration {
     arguments: Vec<String>,
     dependencies: Vec<String>,
     restart_policy: RestartPolicy,
-    user: String,
-    group: String,
+    user: Option<String>,
+    group: Option<String>,
     enabled: bool,
 }
 
@@ -47,19 +43,33 @@ impl UnitConfiguration {
     /// If user is valid, return its uid
     /// Otherwise, return own uid
     fn determine_uid(&self) -> u32 {
-        return match get_user_by_name(&self.user) {
-            Some(user) => user.uid(),
-            None => get_current_uid(),
-        };
+        return match &self.user {
+            Some(user) => {
+                match get_user_by_name(user) {
+                    Some(user) => user.uid(),
+                    None => get_current_uid(),
+                }
+            },
+            None => {
+                get_current_uid()
+            }
+        }
     }
 
     /// If group is valid, return its gid
     /// Otherwise, return own gid
     fn determine_gid(&self) -> u32 {
-        return match get_group_by_name(&self.group) {
-            Some(group) => group.gid(),
-            None => get_current_gid(),
-        };
+        return match &self.group {
+            Some(group) => {
+                match get_group_by_name(group) {
+                    Some(group) => group.gid(),
+                    None => get_current_gid(),
+                }
+            },
+            None => {
+                get_current_gid()
+            }
+        }
     }
 }
 
@@ -67,7 +77,6 @@ impl UnitConfiguration {
 #[derive(Deserialize, Debug)]
 pub struct Configuration {
     pub application: ApplicationConfiguration,
-    watchdog: WatchdogConfiguration,
     units: Vec<UnitConfiguration>,
 }
 
@@ -154,15 +163,11 @@ impl Configuration {
 mod tests {
     use super::*;
 
-    fn sample_working_conf() -> String {
+    fn sample_working_all_conf() -> String {
         return String::from(
             r#"
                 [application]
                 log_level = "debug"
-
-                [watchdog]
-                enabled = true
-                timeout_s = 10
 
                 [[units]]
                 name = "foo"
@@ -187,15 +192,10 @@ mod tests {
         );
     }
 
-    fn sample_non_working_conf() -> String {
+    fn sample_working_mandatory_only_conf() -> String {
         return String::from(
             r#"
                 [application]
-                log_level = "debug"
-
-                [watchdog]
-                enabled = true
-                timeout_s = 10
 
                 [[units]]
                 name = "foo"
@@ -221,43 +221,41 @@ mod tests {
 
     #[test]
     fn from_string_should_work() {
-        let content= sample_working_conf();
+        let content= sample_working_all_conf();
         let configuration = Configuration::from_string(content).unwrap();
 
-        assert_eq!(configuration.application.log_level, "debug");
-        assert_eq!(configuration.watchdog.enabled, true);
-        assert_eq!(configuration.watchdog.timeout_s, 10);
+        assert_eq!(configuration.application.log_level.unwrap(), LogLevel::Debug);
         assert_eq!(configuration.units.len(), 2);
     }
 
     #[test]
-    fn from_string_when_missing_keys_should_return_error() {
-        let content= sample_non_working_conf();
-        let configuration = Configuration::from_string(content);
+    fn from_string_when_missing_optional_keys_should_work() {
+        let content= sample_working_mandatory_only_conf();
+        let configuration = Configuration::from_string(content).unwrap();
 
-        assert!(configuration.is_err());
+        assert_eq!(configuration.application.log_level, None);
     }
 
     #[test]
     fn from_file_should_work() {
-        let configuration = Configuration::from_file(String::from("resources/tsm-unitman.toml")).unwrap();
+        let file = String::from("resources/tsm-unitman.toml");
+        let configuration = Configuration::from_file(file).unwrap();
 
-        assert_eq!(configuration.application.log_level, "debug");
-        assert_eq!(configuration.watchdog.enabled, true);
-        assert_eq!(configuration.watchdog.timeout_s, 10);
+        assert_eq!(configuration.application.log_level.unwrap(), LogLevel::Debug);
         assert_eq!(configuration.units.len(), 2);
     }
 
     #[test]
     fn from_file_when_file_invalid_should_return_error() {
-        let configuration = Configuration::from_file(String::from("foo/bar/invalid.file"));
+        let file = String::from("foo/bar/invalid.file");
+        let configuration = Configuration::from_file(file);
 
         assert!(configuration.is_err());
     }
 
     #[test]
     fn build_units_should_work() {
-        let content= sample_working_conf();
+        let content= sample_working_all_conf();
         let configuration = Configuration::from_string(content).unwrap();
 
         let units = configuration.build_units();

@@ -2,9 +2,9 @@ use std::sync::MutexGuard;
 use std::thread::{sleep, spawn};
 use std::thread::JoinHandle;
 use std::time::Duration;
-use log::{warn, error, debug};
+use log::{debug, error, warn};
 use crate::unit::manager::{Manager, ManagerRef};
-use crate::unit::unit::RestartPolicy;
+use crate::unit::restart_policy::RestartPolicy;
 
 
 pub struct Runner {}
@@ -200,7 +200,9 @@ impl Runner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use users::{get_current_uid, get_current_gid};
+    use users::{get_current_gid, get_current_uid};
+    use crate::unit::restart_policy::RestartPolicy;
+    use crate::unit::unit::{Unit, UnitRef};
 
     fn build_unitrefs() -> Vec<UnitRef> {
         let unit1 = Unit::new_ref(
