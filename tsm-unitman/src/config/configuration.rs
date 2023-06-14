@@ -118,6 +118,10 @@ mod tests {
                 user = ""
                 group = ""
                 enabled = true
+                startup_probe.command = ["ls", "/tmp"]
+                readiness_probe.command = ["ls", "/tmp"]
+                liveness_probe.command = ["ls", "/tmp"]
+                liveness_probe.interval_s = 5
 
                 [[units]]
                 name = "bar"
@@ -128,6 +132,10 @@ mod tests {
                 user = ""
                 group = ""
                 enabled = true
+                startup_probe.command = ["ls", "/tmp"]
+                readiness_probe.command = ["ls", "/tmp"]
+                liveness_probe.command = ["ls", "/tmp"]
+                liveness_probe.interval_s = 5
             "#,
         );
     }

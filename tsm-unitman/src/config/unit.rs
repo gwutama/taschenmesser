@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use users::{get_current_gid, get_current_uid, get_group_by_name, get_user_by_name};
 
+use crate::config::{StartupProbe, ReadinessProbe, LivenessProbe};
 use crate::unit;
 
 
@@ -14,6 +15,9 @@ pub struct Unit {
     user: Option<String>,
     group: Option<String>,
     enabled: Option<bool>,
+    startup_probe: Option<StartupProbe>,
+    readiness_probe: Option<ReadinessProbe>,
+    liveness_probe: Option<LivenessProbe>,
 }
 
 
