@@ -3,6 +3,6 @@ use crate::config::LogLevel;
 
 
 #[derive(Deserialize, Debug)]
-pub struct ApplicationConfiguration {
+pub struct Application {
     pub log_level: Option<LogLevel>,
 }

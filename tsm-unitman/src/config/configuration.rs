@@ -2,16 +2,15 @@ use std::collections::HashMap;
 use std::fs;
 use serde::Deserialize;
 use log::{error, warn};
-use users::{get_current_gid, get_current_uid, get_group_by_name, get_user_by_name};
 
-use crate::config::{ApplicationConfiguration, UnitConfiguration, LogLevel};
-use crate::unit::{Unit, UnitRef, RestartPolicy};
+use crate::config::{Application, Unit};
+use crate::unit;
 
 
 #[derive(Deserialize, Debug)]
 pub struct Configuration {
-    pub application: ApplicationConfiguration,
-    units: Vec<UnitConfiguration>,
+    pub application: Application,
+    units: Vec<Unit>,
 }
 
 
@@ -38,12 +37,12 @@ impl Configuration {
         }
     }
 
-    pub fn build_units(&self) -> Vec<UnitRef> {
+    pub fn build_units(&self) -> Vec<unit::UnitRef> {
         let mut units = Vec::new();
 
         // In order to build the dependencies, we need to build all units first and push them
         // into a hash map. Then, we can iterate over the hash map and build the dependencies.
-        let mut unit_map: HashMap<String, UnitRef> = HashMap::new();
+        let mut unit_map: HashMap<String, unit::UnitRef> = HashMap::new();
 
         for unit_configuration in &self.units {
             let unit_ref = unit_configuration.build_ref();
@@ -102,6 +101,7 @@ impl Configuration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::LogLevel;
 
     fn sample_working_all_conf() -> String {
         return String::from(

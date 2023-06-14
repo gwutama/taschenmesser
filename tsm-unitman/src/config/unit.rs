@@ -1,27 +1,27 @@
 use serde::Deserialize;
 use users::{get_current_gid, get_current_uid, get_group_by_name, get_user_by_name};
 
-use crate::unit::{Unit, UnitRef, RestartPolicy};
+use crate::unit;
 
 
 #[derive(Deserialize, Debug)]
-pub struct UnitConfiguration {
+pub struct Unit {
     pub name: String,
     executable: String,
     arguments: Option<Vec<String>>,
     pub dependencies: Option<Vec<String>>,
-    restart_policy: Option<RestartPolicy>,
+    restart_policy: Option<unit::RestartPolicy>,
     user: Option<String>,
     group: Option<String>,
     enabled: Option<bool>,
 }
 
 
-impl UnitConfiguration {
-    pub fn build_ref(&self) -> UnitRef {
+impl Unit {
+    pub fn build_ref(&self) -> unit::UnitRef {
         let restart_policy = match &self.restart_policy {
             Some(restart_policy) => restart_policy.clone(),
-            None => RestartPolicy::Always,
+            None => unit::RestartPolicy::Always,
         };
 
         let enabled = match &self.enabled {
@@ -34,7 +34,7 @@ impl UnitConfiguration {
             None => Vec::new(),
         };
 
-        return Unit::new_ref(
+        return unit::Unit::new_ref(
             self.name.clone(),
             self.executable.clone(),
             arguments,
