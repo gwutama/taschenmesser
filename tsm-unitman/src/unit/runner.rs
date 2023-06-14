@@ -130,6 +130,8 @@ impl Runner {
                 for unit in units {
                     match unit.lock() {
                         Ok(mut unit) => {
+                            unit.liveness_probe();
+
                             if *unit.restart_policy() == RestartPolicy::Always && !unit.test_running() {
                                 debug!("Unit {} is not running, restarting", unit.name());
                                 let start_result = unit.start();
@@ -214,8 +216,6 @@ mod tests {
             get_current_gid(),
             true,
             None,
-            None,
-            None,
         );
 
         let unit2 = Unit::new_ref(
@@ -226,8 +226,6 @@ mod tests {
             get_current_uid(),
             get_current_gid(),
             true,
-            None,
-            None,
             None,
         );
 
@@ -241,8 +239,6 @@ mod tests {
             get_current_uid(),
             get_current_gid(),
             true,
-            None,
-            None,
             None,
         );
 

@@ -15,8 +15,6 @@ pub struct Unit {
     user: Option<String>,
     group: Option<String>,
     enabled: Option<bool>,
-    startup_probe: Option<ProcessProbe>,
-    readiness_probe: Option<ProcessProbe>,
     liveness_probe: Option<ProcessProbe>,
 }
 
@@ -38,16 +36,6 @@ impl Unit {
             None => Vec::new(),
         };
 
-        let startup_probe = match &self.startup_probe {
-            Some(startup_probe) => Some(startup_probe.build_ref()),
-            None => None,
-        };
-
-        let readiness_probe = match &self.readiness_probe {
-            Some(readiness_probe) => Some(readiness_probe.build_ref()),
-            None => None,
-        };
-
         let liveness_probe = match &self.liveness_probe {
             Some(liveness_probe) => Some(liveness_probe.build_ref()),
             None => None,
@@ -61,8 +49,6 @@ impl Unit {
             self.determine_uid(),
             self.determine_gid(),
             enabled,
-            startup_probe,
-            readiness_probe,
             liveness_probe,
         );
     }

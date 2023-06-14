@@ -1,9 +1,10 @@
 use std::io::Error;
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 use process_control::{ChildExt, Control, ExitStatus};
 use std::time::SystemTime;
 use std::sync::{Arc, Mutex};
+use log::{debug, warn, trace};
 
 
 pub type ProcessProbeRef = Arc<Mutex<ProcessProbe>>;
@@ -33,7 +34,7 @@ impl ProcessProbe {
             arguments,
             timeout_s,
             interval_s,
-            probe_timestamp: None,
+            probe_timestamp: Some(Instant::now()),
         };
     }
 
@@ -65,9 +66,15 @@ impl ProcessProbe {
                 }
             },
             _ => {
-                let probe_now = self.secs_since_last_probe(self.probe_timestamp) >= self.interval_s as u64;
-                self.probe_timestamp = Some(now);
-                probe_now
+                let secs_since = self.secs_since_last_probe(self.probe_timestamp);
+                let probe_now = secs_since >= self.interval_s as u64;
+
+                if probe_now {
+                    self.probe_timestamp = Some(now);
+                    true
+                } else {
+                    false
+                }
             }
         }
     }
@@ -85,8 +92,11 @@ impl ProcessProbe {
 
     /// Probe once and returns whether it was successful.
     /// timeout_s: 0 means no timeout
+    /// Ok: true if process executed successfully, false if it is still not time to probe
+    /// Error: process failed to execute, or timed out, or exited with non-zero exit code
     pub fn probe(&mut self) -> Result<bool, String> {
         if !self.is_time_to_probe() {
+            trace!("Not time to probe yet");
             return Ok(false);
         }
 
@@ -97,6 +107,8 @@ impl ProcessProbe {
 
         let process = Command::new(&self.executable)
             .args(&self.arguments)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn();
 
         return match process {
@@ -112,6 +124,7 @@ impl ProcessProbe {
                         match output {
                             Some(exit_status) => {
                                 if exit_status.success() {
+                                    trace!("Probe successful");
                                     Ok(true)
                                 } else {
                                     Err(format!("Process exited with non-zero exit code: {}", exit_status))

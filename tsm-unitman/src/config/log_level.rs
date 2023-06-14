@@ -9,6 +9,7 @@ pub enum LogLevel {
     Info,
     Warn,
     Error,
+    Trace,
 }
 
 
@@ -32,6 +33,7 @@ impl FromStr for LogLevel {
             "info" => Ok(LogLevel::Info),
             "warn" => Ok(LogLevel::Warn),
             "error" => Ok(LogLevel::Error),
+            "trace" => Ok(LogLevel::Trace),
             _ => Err(format!("Unknown log level: {}", s)),
         }
     }
@@ -45,6 +47,8 @@ impl ToString for LogLevel {
             LogLevel::Info => "info".to_string(),
             LogLevel::Warn => "warn".to_string(),
             LogLevel::Error => "error".to_string(),
+            LogLevel::Trace => "trace".to_string(),
+            _ => "info".to_string(),
         }
     }
 }
