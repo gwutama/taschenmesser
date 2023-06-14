@@ -3,7 +3,7 @@ use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
 use sysinfo::{Pid, PidExt, ProcessRefreshKind, System, SystemExt};
 
-use crate::unit::{RestartPolicy, ProcessProbe};
+use crate::unit::{RestartPolicy, ProcessProbeRef, ProbeState};
 
 
 pub type UnitRef = Arc<Mutex<Unit>>;
@@ -19,11 +19,12 @@ pub struct Unit {
     uid: u32,
     gid: u32,
     enabled: bool,
-    startup_probe: Option<ProcessProbe>,
-    readiness_probe: Option<ProcessProbe>,
-    liveness_probe: Option<ProcessProbe>,
+    startup_probe: Option<ProcessProbeRef>,
+    readiness_probe: Option<ProcessProbeRef>,
+    liveness_probe: Option<ProcessProbeRef>,
     child: Option<Box<Child>>,
     system_info: System,
+    probe_state: ProbeState,
 }
 
 
@@ -36,9 +37,9 @@ impl Unit {
         uid: u32,
         gid: u32,
         enabled: bool,
-        startup_probe: Option<ProcessProbe>,
-        readiness_probe: Option<ProcessProbe>,
-        liveness_probe: Option<ProcessProbe>,
+        startup_probe: Option<ProcessProbeRef>,
+        readiness_probe: Option<ProcessProbeRef>,
+        liveness_probe: Option<ProcessProbeRef>,
     ) -> Unit {
         Unit {
             name,
@@ -54,6 +55,7 @@ impl Unit {
             liveness_probe,
             child: None,
             system_info: System::new(),
+            probe_state: ProbeState::Unknown,
         }
     }
 
@@ -65,9 +67,9 @@ impl Unit {
         uid: u32,
         gid: u32,
         enabled: bool,
-        startup_probe: Option<ProcessProbe>,
-        readiness_probe: Option<ProcessProbe>,
-        liveness_probe: Option<ProcessProbe>,
+        startup_probe: Option<ProcessProbeRef>,
+        readiness_probe: Option<ProcessProbeRef>,
+        liveness_probe: Option<ProcessProbeRef>,
     ) -> UnitRef {
         Arc::new(Mutex::new(Unit::new(
             name,
@@ -227,6 +229,67 @@ impl Unit {
         }
 
         return (true, String::from(""));
+    }
+
+    /// Execute .probe() on all probes and return true if all probes are successful
+    pub fn probe_all(&mut self) -> Result<bool, String> {
+        let mut success = true;
+
+        if self.probe_state == ProbeState::Unknown {
+            match self.startup_probe {
+                Some(ref mut probe) => {
+                    let probe_success_result = probe.lock().unwrap().probe();
+                    match probe_success_result {
+                        Ok(probe_success) => {
+                            success = success && probe_success;
+                            self.probe_state = ProbeState::Startup;
+                        }
+                        Err(error) => {
+                            return Err(format!("Failed to probe unit {} for startup: {}", self.name, error));
+                        }
+                    }
+                }
+                None => {}
+            }
+        }
+
+        if self.probe_state == ProbeState::Startup {
+            match self.readiness_probe {
+                Some(ref mut probe) => {
+                    let probe_success_result = probe.lock().unwrap().probe();
+                    match probe_success_result {
+                        Ok(probe_success) => {
+                            success = success && probe_success;
+                            self.probe_state = ProbeState::Ready;
+                        }
+                        Err(error) => {
+                            return Err(format!("Failed to probe unit {} for readiness: {}", self.name, error));
+                        }
+                    }
+                }
+                None => {}
+            }
+        }
+
+        if self.probe_state == ProbeState::Ready {
+            match self.liveness_probe {
+                Some(ref mut probe) => {
+                    let probe_success_result = probe.lock().unwrap().probe();
+                    match probe_success_result {
+                        Ok(probe_success) => {
+                            success = success && probe_success;
+                            self.probe_state = ProbeState::Alive;
+                        }
+                        Err(error) => {
+                            return Err(format!("Failed to probe unit {} for liveness: {}", self.name, error));
+                        }
+                    }
+                }
+                None => {}
+            }
+        }
+
+        return Ok(success);
     }
 }
 

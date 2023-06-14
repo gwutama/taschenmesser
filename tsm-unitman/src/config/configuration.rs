@@ -103,7 +103,7 @@ mod tests {
     use super::*;
     use crate::config::LogLevel;
 
-    fn sample_working_all_conf() -> String {
+    fn sample_working_complete_conf() -> String {
         return String::from(
             r#"
                 [application]
@@ -118,10 +118,18 @@ mod tests {
                 user = ""
                 group = ""
                 enabled = true
-                startup_probe.command = ["ls", "/tmp"]
-                readiness_probe.command = ["ls", "/tmp"]
-                liveness_probe.command = ["ls", "/tmp"]
+                startup_probe.executable = "ls"
+                startup_probe.arguments = ["/tmp"]
+                startup_probe.interval_s = 5
+                startup_probe.timeout_s = 5
+                readiness_probe.executable = "ls"
+                readiness_probe.arguments = ["/tmp"]
+                readiness_probe.interval_s = 5
+                readiness_probe.timeout_s = 5
+                liveness_probe.executable = "ls"
+                liveness_probe.arguments = ["/tmp"]
                 liveness_probe.interval_s = 5
+                liveness_probe.timeout_s = 5
 
                 [[units]]
                 name = "bar"
@@ -132,10 +140,18 @@ mod tests {
                 user = ""
                 group = ""
                 enabled = true
-                startup_probe.command = ["ls", "/tmp"]
-                readiness_probe.command = ["ls", "/tmp"]
-                liveness_probe.command = ["ls", "/tmp"]
+                startup_probe.executable = "ls"
+                startup_probe.arguments = ["/tmp"]
+                startup_probe.interval_s = 5
+                startup_probe.timeout_s = 5
+                readiness_probe.executable = "ls"
+                readiness_probe.arguments = ["/tmp"]
+                readiness_probe.interval_s = 5
+                readiness_probe.timeout_s = 5
+                liveness_probe.executable = "ls"
+                liveness_probe.arguments = ["/tmp"]
                 liveness_probe.interval_s = 5
+                liveness_probe.timeout_s = 5
             "#,
         );
     }
@@ -158,6 +174,18 @@ mod tests {
                 user = ""
                 group = ""
                 enabled = true
+                startup_probe.executable = "ls"
+                startup_probe.arguments = ["/tmp"]
+                startup_probe.interval_s = 5
+                startup_probe.timeout_s = 5
+                readiness_probe.executable = "ls"
+                readiness_probe.arguments = ["/tmp"]
+                readiness_probe.interval_s = 5
+                readiness_probe.timeout_s = 5
+                liveness_probe.executable = "ls"
+                liveness_probe.arguments = ["/tmp"]
+                liveness_probe.interval_s = 5
+                liveness_probe.timeout_s = 5
             "#,
         );
     }
@@ -165,7 +193,7 @@ mod tests {
 
     #[test]
     fn from_string_should_work() {
-        let content= sample_working_all_conf();
+        let content= sample_working_complete_conf();
         let configuration = Configuration::from_string(content).unwrap();
 
         assert_eq!(configuration.application.log_level.unwrap(), LogLevel::Debug);
@@ -199,7 +227,7 @@ mod tests {
 
     #[test]
     fn build_units_should_work() {
-        let content= sample_working_all_conf();
+        let content= sample_working_complete_conf();
         let configuration = Configuration::from_string(content).unwrap();
 
         let units = configuration.build_units();

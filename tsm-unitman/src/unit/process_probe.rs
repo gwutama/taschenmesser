@@ -1,17 +1,21 @@
 use std::io::Error;
 use std::process::{Child, Command};
-use std::time::Duration;
-use serde::Deserialize;
+use std::time::{Duration, Instant};
 use process_control::{ChildExt, Control, ExitStatus};
-use log::{warn, debug};
+use std::time::SystemTime;
+use std::sync::{Arc, Mutex};
 
 
-#[derive(Deserialize, Debug, Clone)]
+pub type ProcessProbeRef = Arc<Mutex<ProcessProbe>>;
+
+
+#[derive(Debug, Clone)]
 pub struct ProcessProbe {
     executable: String,
     arguments: Vec<String>,
     timeout_s: i32,
     interval_s: i32,
+    probe_timestamp: Option<Instant>,
 }
 
 
@@ -29,34 +33,64 @@ impl ProcessProbe {
             arguments,
             timeout_s,
             interval_s,
+            probe_timestamp: None,
         };
     }
 
-    /// executes probe_with_internal_and_timeout() within a thread
-    pub fn probe(&self, success_callback_fn: fn()) {
-        let cloned_self = self.clone();
-        std::thread::spawn(move || {
-            cloned_self.probe_with_interval_and_timeout(success_callback_fn);
-        });
+    pub fn new_ref(
+        executable: String,
+        arguments: Vec<String>,
+        timeout_s: i32,
+        interval_s: i32,
+    ) -> ProcessProbeRef {
+        return Arc::new(Mutex::new(ProcessProbe::new(
+            executable,
+            arguments,
+            timeout_s,
+            interval_s,
+        )));
     }
 
     /// interval_s: 0 means no interval (run once)
-    fn probe_with_interval_and_timeout(&self, success_callback_fn: fn()) {
-        /// interval_s: 0 means no interval (run once)
-        if self.interval_s == 0 {
-            self.probe_with_timeout(success_callback_fn);
-        }
+    fn is_time_to_probe(&mut self) -> bool {
+        let now = Instant::now();
 
-        loop {
-            self.probe_with_timeout(success_callback_fn);
-            std::thread::sleep(Duration::from_secs(self.interval_s as u64));
+        return match self.interval_s {
+            0 => {
+                if self.probe_timestamp.is_none() {
+                    self.probe_timestamp = Some(now);
+                    true
+                } else {
+                    false
+                }
+            },
+            _ => {
+                let probe_now = self.secs_since_last_probe(self.probe_timestamp) >= self.interval_s as u64;
+                self.probe_timestamp = Some(now);
+                probe_now
+            }
+        }
+    }
+
+    fn secs_since_last_probe(&self, before: Option<Instant>) -> u64 {
+        let now = Instant::now();
+
+        return match before {
+            Some(before) => {
+                now.duration_since(before).as_secs()
+            },
+            None => 0
         }
     }
 
     /// Probe once and returns whether it was successful.
     /// timeout_s: 0 means no timeout
-    fn probe_with_timeout(&self, success_callback_fn: fn()) {
-        let timeout_s: u64 = match self.timeout_s {
+    pub fn probe(&mut self) -> Result<bool, String> {
+        if !self.is_time_to_probe() {
+            return Ok(false);
+        }
+
+        let timeout_s = match self.timeout_s {
             0 => 3600, // ok, not really a timeout but it is absurdly long enough
             _ => self.timeout_s as u64
         };
@@ -67,7 +101,7 @@ impl ProcessProbe {
 
         return match process {
             Ok(mut child) => {
-                let output_result: Result<Option<process_control::ExitStatus>, Error> = child
+                let output_result: Result<Option<ExitStatus>, Error> = child
                     .controlled()
                     .time_limit(Duration::from_secs(timeout_s))
                     .terminate_for_timeout()
@@ -78,21 +112,23 @@ impl ProcessProbe {
                         match output {
                             Some(exit_status) => {
                                 if exit_status.success() {
-                                    success_callback_fn();
+                                    Ok(true)
                                 } else {
-                                    warn!("Process exited with non-zero exit code: {}", exit_status);
+                                    Err(format!("Process exited with non-zero exit code: {}", exit_status))
                                 }
                             }
                             None => {
-                                warn!("Process timed out after {} seconds", self.timeout_s);
+                                Err(format!("Process timed out after {} seconds", self.timeout_s))
                             }
                         }
                     },
-                    Err(e) => warn!("Failed executing command {}: {}", self.executable, e)
+                    Err(e) => {
+                        Err(format!("Failed executing command {}: {}", self.executable, e))
+                    }
                 }
             }
             Err(e) => {
-                warn!("Failed executing command {}: {}", self.executable, e);
+                Err(format!("Failed executing command {}: {}", self.executable, e))
             }
         }
     }

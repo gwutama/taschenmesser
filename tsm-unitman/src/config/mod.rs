@@ -9,3 +9,6 @@ pub use log_level::LogLevel;
 
 mod unit;
 pub use unit::Unit;
+
+mod process_probe;
+pub use process_probe::ProcessProbe;

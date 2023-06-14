@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use users::{get_current_gid, get_current_uid, get_group_by_name, get_user_by_name};
 
+use crate::config::ProcessProbe;
 use crate::unit;
 
 
@@ -14,9 +15,9 @@ pub struct Unit {
     user: Option<String>,
     group: Option<String>,
     enabled: Option<bool>,
-    startup_probe: Option<unit::ProcessProbe>,
-    readiness_probe: Option<unit::ProcessProbe>,
-    liveness_probe: Option<unit::ProcessProbe>,
+    startup_probe: Option<ProcessProbe>,
+    readiness_probe: Option<ProcessProbe>,
+    liveness_probe: Option<ProcessProbe>,
 }
 
 
@@ -37,6 +38,21 @@ impl Unit {
             None => Vec::new(),
         };
 
+        let startup_probe = match &self.startup_probe {
+            Some(startup_probe) => Some(startup_probe.build_ref()),
+            None => None,
+        };
+
+        let readiness_probe = match &self.readiness_probe {
+            Some(readiness_probe) => Some(readiness_probe.build_ref()),
+            None => None,
+        };
+
+        let liveness_probe = match &self.liveness_probe {
+            Some(liveness_probe) => Some(liveness_probe.build_ref()),
+            None => None,
+        };
+
         return unit::Unit::new_ref(
             self.name.clone(),
             self.executable.clone(),
@@ -45,9 +61,9 @@ impl Unit {
             self.determine_uid(),
             self.determine_gid(),
             enabled,
-            self.startup_probe.clone(),
-            self.readiness_probe.clone(),
-            self.liveness_probe.clone(),
+            startup_probe,
+            readiness_probe,
+            liveness_probe,
         );
     }
 
