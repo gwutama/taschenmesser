@@ -9,3 +9,6 @@ pub use manager::{Manager, ManagerRef};
 
 mod restart_policy;
 pub use restart_policy::RestartPolicy;
+
+mod process_probe;
+pub use process_probe::ProcessProbe;

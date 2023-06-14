@@ -3,7 +3,7 @@ use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
 use sysinfo::{Pid, PidExt, ProcessRefreshKind, System, SystemExt};
 
-use crate::unit::RestartPolicy;
+use crate::unit::{RestartPolicy, ProcessProbe};
 
 
 pub type UnitRef = Arc<Mutex<Unit>>;
@@ -19,6 +19,9 @@ pub struct Unit {
     uid: u32,
     gid: u32,
     enabled: bool,
+    startup_probe: Option<ProcessProbe>,
+    readiness_probe: Option<ProcessProbe>,
+    liveness_probe: Option<ProcessProbe>,
     child: Option<Box<Child>>,
     system_info: System,
 }
@@ -33,6 +36,9 @@ impl Unit {
         uid: u32,
         gid: u32,
         enabled: bool,
+        startup_probe: Option<ProcessProbe>,
+        readiness_probe: Option<ProcessProbe>,
+        liveness_probe: Option<ProcessProbe>,
     ) -> Unit {
         Unit {
             name,
@@ -43,6 +49,9 @@ impl Unit {
             uid,
             gid,
             enabled,
+            startup_probe,
+            readiness_probe,
+            liveness_probe,
             child: None,
             system_info: System::new(),
         }
@@ -56,6 +65,9 @@ impl Unit {
         uid: u32,
         gid: u32,
         enabled: bool,
+        startup_probe: Option<ProcessProbe>,
+        readiness_probe: Option<ProcessProbe>,
+        liveness_probe: Option<ProcessProbe>,
     ) -> UnitRef {
         Arc::new(Mutex::new(Unit::new(
             name,
@@ -65,6 +77,9 @@ impl Unit {
             uid,
             gid,
             enabled,
+            startup_probe,
+            readiness_probe,
+            liveness_probe,
         )))
     }
 
@@ -230,6 +245,9 @@ mod tests {
             get_current_uid(),
             get_current_gid(),
             true,
+            None,
+            None,
+            None,
         );
     }
 
@@ -242,6 +260,9 @@ mod tests {
             get_current_uid(),
             get_current_gid(),
             true,
+            None,
+            None,
+            None,
         );
 
         let unit2 = Unit::new_ref(
@@ -252,6 +273,9 @@ mod tests {
             get_current_uid(),
             get_current_gid(),
             true,
+            None,
+            None,
+            None,
         );
 
         unit2.lock().unwrap().add_dependency(unit1.clone());

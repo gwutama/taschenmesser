@@ -1,7 +1,6 @@
 use serde::Deserialize;
 use users::{get_current_gid, get_current_uid, get_group_by_name, get_user_by_name};
 
-use crate::config::{StartupProbe, ReadinessProbe, LivenessProbe};
 use crate::unit;
 
 
@@ -15,9 +14,9 @@ pub struct Unit {
     user: Option<String>,
     group: Option<String>,
     enabled: Option<bool>,
-    startup_probe: Option<StartupProbe>,
-    readiness_probe: Option<ReadinessProbe>,
-    liveness_probe: Option<LivenessProbe>,
+    startup_probe: Option<unit::ProcessProbe>,
+    readiness_probe: Option<unit::ProcessProbe>,
+    liveness_probe: Option<unit::ProcessProbe>,
 }
 
 
@@ -45,7 +44,11 @@ impl Unit {
             restart_policy,
             self.determine_uid(),
             self.determine_gid(),
-            enabled);
+            enabled,
+            self.startup_probe.clone(),
+            self.readiness_probe.clone(),
+            self.liveness_probe.clone(),
+        );
     }
 
     /// If user is valid, return its uid

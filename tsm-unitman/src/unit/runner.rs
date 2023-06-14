@@ -213,6 +213,9 @@ mod tests {
             get_current_uid(),
             get_current_gid(),
             true,
+            None,
+            None,
+            None,
         );
 
         let unit2 = Unit::new_ref(
@@ -223,6 +226,9 @@ mod tests {
             get_current_uid(),
             get_current_gid(),
             true,
+            None,
+            None,
+            None,
         );
 
         unit2.lock().unwrap().add_dependency(unit1.clone());
@@ -235,6 +241,9 @@ mod tests {
             get_current_uid(),
             get_current_gid(),
             true,
+            None,
+            None,
+            None,
         );
 
         unit3.lock().unwrap().add_dependency(unit1.clone());
