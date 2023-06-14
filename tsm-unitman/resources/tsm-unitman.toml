@@ -7,8 +7,8 @@ timeout_s = 10
 
 [[units]]
 name = "foo"
-executable = "ls"
-arguments = [ "-l", "-a" ]
+executable = "sleep"
+arguments = [ "10" ]
 dependencies = []
 restart_policy = "always" # implies that watchdog events must be sent by the executable
 user = "" # default. If empty, the user of the current process is used
@@ -18,7 +18,7 @@ enabled = true # default
 [[units]]
 name = "bar"
 executable = "ps"
-arguments = [ "-aux" ]
+arguments = [ "aux" ]
 dependencies = [ "foo" ]
 restart_policy = "never" # run once, no watchdog events are expected
 user = "" # default. If empty, the user of the current process is used

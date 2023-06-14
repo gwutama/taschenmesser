@@ -8,20 +8,20 @@ use users::{get_current_uid, get_current_gid, get_user_by_name, get_group_by_nam
 const LOG_TAG: &str = "[Configuration]";
 
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct ApplicationConfiguration {
     log_level: String,
 }
 
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct WatchdogConfiguration {
     enabled: bool,
     timeout_s: u32,
 }
 
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct UnitConfiguration {
     name: String,
     executable: String,
@@ -66,7 +66,7 @@ impl UnitConfiguration {
 }
 
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Configuration {
     application: ApplicationConfiguration,
     watchdog: WatchdogConfiguration,
