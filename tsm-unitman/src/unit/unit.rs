@@ -95,24 +95,37 @@ impl Unit {
     /// A unit is running if it has a child process and
     /// its probe state is either Alive or Unknown (i.e. no probe) a.k.a not Dead.
     pub fn test_running(&mut self) -> bool {
-        return match self.child {
+        match self.child {
             Some(ref child) => {
                 // Check if child process is still alive
                 let pid = Pid::from_u32(child.id());
                 let refresh_kind = ProcessRefreshKind::new();
                 let process_exists = self.system_info.refresh_process_specifics(pid, refresh_kind);
 
-                if process_exists && self.probe_state != ProbeState::Dead {
+                if process_exists && (self.probe_state == ProbeState::Alive || self.probe_state == ProbeState::Unknown) {
                     trace!("Unit {} is running", self.name);
-                    true
-                } else {
+                    return true;
+                }
+
+                if !process_exists {
                     trace!("Unit {} is NOT running", self.name);
                     self.child = None;
-                    false
+
+                    // if process does not exist anymore and restart policy is set to never,
+                    // disable liveness probe.
+                    if !self.liveness_probe.is_none() && self.restart_policy == RestartPolicy::Never {
+                        debug!("Unit {} is not running anymore, and restart_policy was configured to never. Disabling liveness probe.", self.name);
+                        self.liveness_probe = None;
+                        self.probe_state = ProbeState::Dead;
+                    }
+
+                    return false;
                 }
+
+                return false;
             }
             None => {
-                false
+                return false;
             }
         }
     }
