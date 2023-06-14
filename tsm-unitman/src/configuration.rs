@@ -19,25 +19,40 @@ pub struct ApplicationConfiguration {
 pub struct UnitConfiguration {
     name: String,
     executable: String,
-    arguments: Vec<String>,
-    dependencies: Vec<String>,
-    restart_policy: RestartPolicy,
+    arguments: Option<Vec<String>>,
+    dependencies: Option<Vec<String>>,
+    restart_policy: Option<RestartPolicy>,
     user: Option<String>,
     group: Option<String>,
-    enabled: bool,
+    enabled: Option<bool>,
 }
 
 
 impl UnitConfiguration {
     pub fn build_ref(&self) -> UnitRef {
+        let restart_policy = match &self.restart_policy {
+            Some(restart_policy) => restart_policy.clone(),
+            None => RestartPolicy::Always,
+        };
+
+        let enabled = match &self.enabled {
+            Some(enabled) => *enabled,
+            None => true,
+        };
+
+        let arguments = match &self.arguments {
+            Some(arguments) => arguments.clone(),
+            None => Vec::new(),
+        };
+
         return Unit::new_ref(
             self.name.clone(),
             self.executable.clone(),
-            self.arguments.clone(),
-            self.restart_policy.clone(),
+            arguments,
+            restart_policy,
             self.determine_uid(),
             self.determine_gid(),
-            self.enabled.clone());
+            enabled);
     }
 
     /// If user is valid, return its uid
@@ -135,23 +150,29 @@ impl Configuration {
                 }
             };
 
-            for dependency_name in &unit_configuration.dependencies {
-                let dependency_unit_ref = match unit_map.get(dependency_name) {
-                    Some(unit_ref) => unit_ref,
-                    None => {
-                        warn!("Dependency {} not found in unit map", dependency_name);
-                        continue;
-                    }
-                };
+            // build dependencies
+            match &unit_configuration.dependencies {
+                Some(dependencies) => {
+                    for dependency_name in dependencies {
+                        let dependency_unit_ref = match unit_map.get(dependency_name) {
+                            Some(unit_ref) => unit_ref,
+                            None => {
+                                warn!("Dependency {} not found in unit map", dependency_name);
+                                continue;
+                            }
+                        };
 
-                match unit_ref.lock() {
-                    Ok(mut unit) => {
-                        unit.add_dependency(dependency_unit_ref.clone());
-                    },
-                    Err(e) => {
-                        error!("Error acquiring lock while building dependency for unit: {}", e);
+                        match unit_ref.lock() {
+                            Ok(mut unit) => {
+                                unit.add_dependency(dependency_unit_ref.clone());
+                            },
+                            Err(e) => {
+                                error!("Error acquiring lock while building dependency for unit: {}", e);
+                            }
+                        };
                     }
-                };
+                },
+                None => {}
             }
         }
 
@@ -182,7 +203,7 @@ mod tests {
                 [[units]]
                 name = "bar"
                 executable = "ps"
-                arguments = [ "-aux" ]
+                arguments = [ "aux" ]
                 dependencies = [ "foo" ]
                 restart_policy = "never"
                 user = ""
@@ -200,15 +221,11 @@ mod tests {
                 [[units]]
                 name = "foo"
                 executable = "ls"
-                arguments = [ "-l", "-a" ]
-                dependencies = []
-                restart_policy = "always"
-                enabled = true
 
                 [[units]]
                 name = "bar"
                 executable = "ps"
-                arguments = [ "-aux" ]
+                arguments = [ "aux" ]
                 dependencies = [ "foo" ]
                 restart_policy = "never"
                 user = ""
