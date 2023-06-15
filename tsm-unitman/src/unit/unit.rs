@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::process::{Child, Command, Stdio};
 use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
@@ -50,7 +51,7 @@ impl Unit {
             liveness_probe,
             child: None,
             system_info: System::new(),
-            probe_state: ProbeState::Unknown,
+            probe_state: ProbeState::Undefined,
         }
     }
 
@@ -95,46 +96,42 @@ impl Unit {
     /// A unit is running if it has a child process and
     /// its probe state is either Alive or Unknown (i.e. no probe) a.k.a not Dead.
     pub fn test_running(&mut self) -> bool {
-        match self.child {
+        return match self.child {
             Some(ref child) => {
                 // Check if child process is still alive
-                let pid = Pid::from_u32(child.id());
-                let refresh_kind = ProcessRefreshKind::new();
-                let process_exists = self.system_info.refresh_process_specifics(pid, refresh_kind);
-
-                if process_exists && (self.probe_state == ProbeState::Alive || self.probe_state == ProbeState::Unknown) {
-                    trace!("Unit {} is running", self.name);
-                    return true;
-                }
-
-                if !process_exists {
-                    trace!("Unit {} is NOT running", self.name);
-                    self.child = None;
-
-                    // if process does not exist anymore and restart policy is set to never,
-                    // disable liveness probe.
-                    if !self.liveness_probe.is_none() && self.restart_policy == RestartPolicy::Never {
-                        debug!("Unit {} is not running anymore, and restart_policy was configured to never. Disabling liveness probe.", self.name);
-                        self.liveness_probe = None;
-                        self.probe_state = ProbeState::Dead;
+                match self.pid() {
+                    Some(pid) => {
+                        trace!("Unit {} is running", self.name);
+                        true
                     }
-
-                    return false;
+                    None => {
+                        trace!("Unit {} is NOT running", self.name);
+                        self.cleanup_handle();
+                        self.cleanup_probe_prevent_unit_restart();
+                        false
+                    }
                 }
-
-                return false;
             }
             None => {
-                return false;
+                false
             }
         }
     }
 
     /// Returns the Process ID (PID) of a child process, if it exists
-    pub fn pid(&self) -> Option<u32> {
+    /// We also check whether the process is still alive.
+    pub fn pid(&mut self) -> Option<u32> {
         return match self.child {
             Some(ref child) => {
-                Some(child.id())
+                let pid = Pid::from_u32(child.id());
+                let refresh_kind = ProcessRefreshKind::new();
+                let process_exists = self.system_info.refresh_process_specifics(pid, refresh_kind);
+
+                if process_exists {
+                    Some(child.id())
+                } else {
+                    None
+                }
             }
             None => {
                 None
@@ -183,19 +180,55 @@ impl Unit {
             Some(ref mut child) => {
                 match child.kill() {
                     Ok(_) => {
-                        self.child = None;
+                        self.cleanup_handle();
+                        self.cleanup_probe_prevent_unit_restart();
+                        Ok(true)
                     }
                     Err(error) => {
-                        return Err(format!("Unit {} failed to stop: {}", self.name, error));
+                        Err(format!("Unit {} failed to stop: {}", self.name, error))
                     }
                 }
             }
             None => {
-                return Err(format!("Cannot stop unit {} because it is NOT running", self.name));
+                Err(format!("Cannot stop unit {} because it is NOT running", self.name))
             }
         }
+    }
 
-        return Ok(true);
+    fn cleanup_handle(&mut self) {
+        match self.child {
+            Some(ref mut child) => {
+                match child.stdout.take() {
+                    Some(mut stdout) => {
+                        drop(stdout);
+                    }
+                    None => {}
+                }
+
+                match child.stderr.take() {
+                    Some(mut stderr) => {
+                        drop(stderr);
+                    }
+                    None => {}
+                }
+
+                self.child = None;
+            }
+            None => {}
+        }
+    }
+
+    fn cleanup_probe_prevent_unit_restart(&mut self) {
+        match self.liveness_probe {
+            Some(ref mut probe) => {
+                if self.restart_policy == RestartPolicy::Never {
+                    debug!("Restart policy of unit {} was configured to never. Stopping probe.", self.name);
+                    self.liveness_probe = None;
+                    self.probe_state = ProbeState::Dead;
+                }
+            }
+            None => {}
+        }
     }
 
     /// A unit is allowed to start if it is enabled and all dependencies are running
