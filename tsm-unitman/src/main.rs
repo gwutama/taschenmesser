@@ -5,6 +5,9 @@ use log::error;
 mod config;
 mod unit;
 
+pub mod tsm_unitman_capnp {
+    include!(concat!(env!("OUT_DIR"), "/tsm_unitman_capnp.rs"));
+}
 
 struct CommandLineParameters {
     config_file: String,

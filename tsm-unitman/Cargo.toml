@@ -15,9 +15,12 @@ ctrlc = "3.4.0"
 log = "0.4.19"
 env_logger = "0.10.0"
 process_control = "4.0.3"
+capnp = "0.17.2"
+
+[build-dependencies]
+capnpc = "0.17.1"
 
 [dev-dependencies]
-
 
 [profile.release]
 codegen-units = 1
