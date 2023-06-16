@@ -48,7 +48,6 @@ impl ToString for LogLevel {
             LogLevel::Warn => "warn".to_string(),
             LogLevel::Error => "error".to_string(),
             LogLevel::Trace => "trace".to_string(),
-            _ => "info".to_string(),
         }
     }
 }

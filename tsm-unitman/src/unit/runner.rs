@@ -132,8 +132,8 @@ impl Runner {
                         Ok(mut unit) => {
                             unit.liveness_probe();
 
-                            if *unit.restart_policy() == RestartPolicy::Always && !unit.test_running() {
-                                debug!("Unit {} is not running, restarting", unit.name());
+                            if !unit.test_running() && *unit.restart_policy() == RestartPolicy::Always {
+                                debug!("Unit {} is not running, restarting because restart policy was set to Always.", unit.name());
                                 let start_result = unit.start();
 
                                 match start_result {

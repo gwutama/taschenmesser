@@ -1,10 +1,9 @@
 use std::io::Error;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 use process_control::{ChildExt, Control, ExitStatus};
-use std::time::SystemTime;
 use std::sync::{Arc, Mutex};
-use log::{debug, warn, trace};
+use log::{trace};
 
 
 pub type ProcessProbeRef = Arc<Mutex<ProcessProbe>>;

@@ -1,5 +1,5 @@
 [application]
-log_level = "trace" # Optional. Defaults to "info". Possible values: "debug", "info", "warn", "error", "trace".
+log_level = "debug" # Optional. Defaults to "info". Possible values: "debug", "info", "warn", "error", "trace".
 
 [[units]]
 name = "foo"                            # Mandatory
@@ -19,7 +19,7 @@ liveness_probe.timeout_s = 5            # Optional. Defaults to 10.
 name = "bar"                            # Mandatory
 executable = "ls"                       # Mandatory
 arguments = [ "-lah" ]                  # Optional. Defaults to empty list.
-dependencies = []                       # Optional. Defaults to empty list.
+dependencies = [ "foo" ]                # Optional. Defaults to empty list.
 restart_policy = "never"                # Optional. Defaults to "always". Possible values: "always", "never".
 user = ""                               # Optional. Defaults to current user.
 group = ""                              # Optional. Defaults to current group.
