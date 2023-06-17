@@ -1,13 +1,16 @@
 use std::process::exit;
 use argparse::{ArgumentParser, Store};
 use log::error;
+use crate::rpc_server::RpcServer;
 
 mod config;
 mod unit;
+mod rpc_server;
 
 pub mod tsm_unitman_capnp {
     include!(concat!(env!("OUT_DIR"), "/tsm_unitman_capnp.rs"));
 }
+
 
 struct CommandLineParameters {
     config_file: String,
@@ -53,7 +56,8 @@ fn init_logger(configuration: &config::Configuration) {
         None => {}
     }
 
-    let env = env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, log_level_to_use.to_string());
+    let env = env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV,
+                                                   log_level_to_use.to_string());
     env_logger::init_from_env(env);
 }
 
@@ -95,6 +99,9 @@ fn main() {
     let params = parse_args_or_exit();
     let configuration = init_config_or_exit(params.config_file);
     init_logger(&configuration);
+
     let manager = init_unit_manager_or_exit(&configuration);
+
+    RpcServer::run_threaded(manager.clone());
     unit::Runner::run(manager.clone());
 }

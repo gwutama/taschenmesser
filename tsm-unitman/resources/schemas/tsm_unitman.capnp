@@ -1,5 +1,9 @@
 @0xe353a58aa853fe2a;
 
+interface UnitMan {
+    getUnits @0 (wtf :Text) -> (units: List(Unit));
+}
+
 struct Unit {
     name @0 :Text;
     executable @1 :Text;
@@ -23,3 +27,4 @@ enum ProbeState {
     alive @1;
     dead @2;
 }
+

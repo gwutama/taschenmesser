@@ -1,7 +1,8 @@
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     capnpc::CompilerCommand::new()
-        // .output_path("src/")
         .src_prefix("resources/schemas/")
         .file("resources/schemas/tsm_unitman.capnp")
-        .run().unwrap();
+        .run()?;
+
+    Ok(())
 }
