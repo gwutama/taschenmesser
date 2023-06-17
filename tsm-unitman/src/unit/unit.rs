@@ -80,10 +80,6 @@ impl Unit {
         self.dependencies.push(unit);
     }
 
-    pub fn dependencies(&self) -> &Vec<UnitRef> {
-        return &self.dependencies;
-    }
-
     pub fn name(&self) -> &String {
         return &self.name;
     }

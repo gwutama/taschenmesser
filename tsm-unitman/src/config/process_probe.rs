@@ -3,6 +3,8 @@ use serde::Deserialize;
 use crate::unit;
 
 #[derive(Deserialize, Debug, Clone)]
+/// timeout_s: 0 means no timeout
+/// interval_s: 0 means no interval (run once)
 pub struct ProcessProbe {
     executable: String,
     arguments: Option<Vec<String>>,
@@ -12,22 +14,6 @@ pub struct ProcessProbe {
 
 
 impl ProcessProbe {
-    /// timeout_s: 0 means no timeout
-    /// interval_s: 0 means no interval (run once)
-    pub fn new(
-        executable: String,
-        arguments: Option<Vec<String>>,
-        timeout_s: Option<i32>,
-        interval_s: Option<i32>
-    ) -> ProcessProbe {
-        return ProcessProbe {
-            executable,
-            arguments,
-            timeout_s,
-            interval_s,
-        };
-    }
-
     pub fn build_ref(&self) -> unit::ProcessProbeRef {
         let arguments = match &self.arguments {
             Some(arguments) => arguments.clone(),
