@@ -1,63 +1,70 @@
-use capnp::capability::Promise;
-use capnp_rpc::{pry, rpc_twoparty_capnp, twoparty, RpcSystem};
-use futures::AsyncReadExt;
-use std::net::ToSocketAddrs;
-use tokio::net::TcpListener;
-use tokio_util::compat::TokioAsyncReadCompatExt;
-use log::warn;
+use std::thread;
+use std::time::Duration;
+use log::{debug};
+use protobuf::Message;
 
-use crate::tsm_unitman_capnp::unit_man;
-use crate::unit::ManagerRef;
+include!(concat!(env!("OUT_DIR"), "/protos/mod.rs"));
+use tsm_unitman_rpc::{RpcRequest, RpcResponse, AckRequest, AckResponse};
 
 
-pub struct RpcServer {
-    unit_manager: ManagerRef,
-}
-
-
-impl unit_man::Server for RpcServer {
-    fn get_units(
-        &mut self,
-        params: unit_man::GetUnitsParams,
-        mut results: unit_man::GetUnitsResults,
-    ) -> Promise<(), capnp::Error> {
-        results.get().init_units(0);
-        Promise::ok(())
-    }
-}
+pub struct RpcServer {}
 
 
 impl RpcServer {
-    pub fn new(unit_manager: ManagerRef) -> RpcServer {
-        RpcServer {
-            unit_manager,
+    pub fn run_threaded() -> thread::JoinHandle<()> {
+        debug!("Spawning thread");
+
+        let thread_handle = thread::spawn(move || {
+            Self::run();
+        });
+
+        return thread_handle;
+    }
+
+    pub fn run() {
+        let context = zmq::Context::new();
+        let responder = context.socket(zmq::REP).unwrap();
+
+        assert!(responder.bind("ipc:///tmp/tsm-unitman.sock").is_ok());
+
+        loop {
+            // https://github.com/pronebird/node-rust-zeromq/blob/master/server/src/main.rs
+            let bytes = responder.recv_bytes(0).unwrap();
+            let request: RpcRequest = Message::parse_from_bytes(&bytes).unwrap();
+            debug!("Received request: {:?}", request);
+
+            // handle request
+            let response = Self::handle_request(&request);
         }
     }
 
-    pub async fn run_threaded(unit_manager: ManagerRef) -> Result<(), Box<dyn std::error::Error>> {
-        tokio::task::LocalSet::new()
-            .run_until(async move {
-                let listener = TcpListener::bind("127.0.0.1:8080").await?;
-                let rpc_server = RpcServer::new(unit_manager.clone());
-                let client: unit_man::Client = capnp_rpc::new_client(rpc_server);
+    fn handle_request(request: &RpcRequest) -> RpcResponse {
+        let method_name: &str = request.method.as_str();
+        let data = &request.data;
 
-                loop {
-                    let (stream, _) = listener.accept().await?;
-                    stream.set_nodelay(true)?;
-                    let (reader, writer) = TokioAsyncReadCompatExt::compat(stream).split();
-                    let network = twoparty::VatNetwork::new(
-                        reader,
-                        writer,
-                        rpc_twoparty_capnp::Side::Server,
-                        Default::default(),
-                    );
+        let mut rpc_response = RpcResponse::new();
+        rpc_response.method = method_name.to_string();
 
-                    let rpc_system =
-                        RpcSystem::new(Box::new(network), Some(client.clone().client));
+        let result = match method_name {
+            ".rpc.Service.ack" => {
+                let mut ack = AckResponse::new();
+                ack.message = "pong".to_string();
+                Ok(ack)
+            },
+            _ => Err("Unknown method"),
+        };
 
-                    tokio::task::spawn_local(rpc_system);
-                }
-            })
-            .await
+        match result {
+            Ok(response) => {
+                rpc_response.status = true;
+                rpc_response.data = response.write_to_bytes().unwrap();
+            },
+            Err(e) => {
+                rpc_response.status = false;
+                rpc_response.error = e.to_string();
+            }
+        }
+
+        return rpc_response;
     }
 }

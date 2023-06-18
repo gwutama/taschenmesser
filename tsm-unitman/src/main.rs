@@ -1,15 +1,10 @@
 use std::process::exit;
 use argparse::{ArgumentParser, Store};
 use log::error;
-use crate::rpc_server::RpcServer;
 
 mod config;
 mod unit;
 mod rpc_server;
-
-pub mod tsm_unitman_capnp {
-    include!(concat!(env!("OUT_DIR"), "/tsm_unitman_capnp.rs"));
-}
 
 
 struct CommandLineParameters {
@@ -100,8 +95,8 @@ fn main() {
     let configuration = init_config_or_exit(params.config_file);
     init_logger(&configuration);
 
-    let manager = init_unit_manager_or_exit(&configuration);
+    rpc_server::RpcServer::run_threaded();
 
-    RpcServer::run_threaded(manager.clone());
+    let manager = init_unit_manager_or_exit(&configuration);
     unit::Runner::run(manager.clone());
 }
