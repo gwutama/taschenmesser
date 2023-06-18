@@ -3,7 +3,7 @@ use tsm_unitman_rpc::{RpcRequest, RpcResponse, AckRequest, AckResponse};
 use protobuf::Message;
 
 fn main() {
-    https://github.com/erickt/rust-zmq/tree/master/examples/zguide
+    // https://github.com/erickt/rust-zmq/tree/master/examples/zguide
     let ctx = zmq::Context::new();
 
     let socket = ctx.socket(zmq::REQ).unwrap();
