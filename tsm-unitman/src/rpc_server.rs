@@ -29,12 +29,28 @@ impl RpcServer {
 
         loop {
             // https://github.com/pronebird/node-rust-zeromq/blob/master/server/src/main.rs
-            let bytes = responder.recv_bytes(0).unwrap();
-            let request: RpcRequest = Message::parse_from_bytes(&bytes).unwrap();
-            debug!("Received request: {:?}", request);
+            let request: Option<RpcRequest> = match responder.recv_bytes(0) {
+                Ok(bytes) => Some(Message::parse_from_bytes(&bytes).unwrap()),
+                Err(e) => None,
+            };
 
             // handle request
-            let response = Self::handle_request(&request);
+            let response: Option<RpcResponse> = match request {
+                Some(request) => {
+                    debug!("Received request: {:?}", request);
+                    Some(Self::handle_request(&request))
+                },
+                None => None,
+            };
+
+            match response {
+                Some(response) => {
+                    debug!("Sending response: {:?}", response);
+                    let message = response.write_to_bytes().unwrap();
+                    responder.send(&message, 0).unwrap();
+                },
+                None => (),
+            }
         }
     }
 

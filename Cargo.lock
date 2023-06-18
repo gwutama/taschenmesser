@@ -713,6 +713,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tsm-unitctl"
+version = "0.1.0"
+dependencies = [
+ "argparse",
+ "env_logger",
+ "log",
+ "protobuf",
+ "protobuf-codegen",
+ "zmq",
+]
+
+[[package]]
 name = "tsm-unitman"
 version = "0.1.0"
 dependencies = [
