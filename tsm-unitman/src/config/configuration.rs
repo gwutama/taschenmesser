@@ -3,13 +3,14 @@ use std::fs;
 use serde::Deserialize;
 use log::{error, warn};
 
-use crate::config::{Application, Unit};
+use crate::config::{Application, Unit, RpcServer};
 use crate::unit;
 
 
 #[derive(Deserialize, Debug)]
 pub struct Configuration {
     pub application: Application,
+    pub rpc_server: RpcServer,
     units: Vec<Unit>,
 }
 

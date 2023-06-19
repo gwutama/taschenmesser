@@ -3,15 +3,26 @@ use std::time::Duration;
 use log::{debug};
 use protobuf::Message;
 
+use unit::ManagerRef;
+
 include!(concat!(env!("OUT_DIR"), "/protos/mod.rs"));
 use tsm_unitman_rpc::{RpcRequest, RpcResponse, AckRequest, AckResponse};
+use crate::unit;
 
 
-pub struct RpcServer {}
+pub struct RpcServer {
+    unit_manager: ManagerRef,
+}
 
 
 impl RpcServer {
-    pub fn run_threaded() -> thread::JoinHandle<()> {
+    pub fn new(unit_manager: ManagerRef) -> Self {
+        Self {
+            unit_manager,
+        }
+    }
+
+    pub fn run_threaded(&self) -> thread::JoinHandle<()> {
         debug!("Spawning thread");
 
         let thread_handle = thread::spawn(move || {
@@ -21,7 +32,7 @@ impl RpcServer {
         return thread_handle;
     }
 
-    pub fn run() {
+    fn run() {
         let context = zmq::Context::new();
         let responder = context.socket(zmq::REP).unwrap();
 

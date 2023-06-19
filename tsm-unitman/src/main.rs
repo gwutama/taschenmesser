@@ -90,13 +90,46 @@ fn init_unit_manager_or_exit(configuration: &config::Configuration) -> unit::Man
 }
 
 
+fn init_rpc_server_or_exit(
+    configuration: &config::Configuration,
+    unit_manager: unit::ManagerRef,
+    ) -> Option<rpc_server::RpcServer> {
+
+    // TODO: Move setting defaults to config::rpc_server?
+    // enabled: defaults to true
+    // bind_address: defaults to "ipc:///tmp/tsm-unitman.sock"
+    let enabled = match configuration.rpc_server.enabled {
+        Some(enabled) => { enabled },
+        None => { true }
+    };
+
+    let bind_address = match configuration.rpc_server.bind_address.clone() {
+        Some(address) => { address },
+        None => { "ipc:///tmp/tsm-unitman.sock".to_string() }
+    };
+
+    if enabled {
+        return Some(rpc_server::RpcServer::new(unit_manager.clone()));
+    }
+
+    None
+}
+
+
 fn main() {
     let params = parse_args_or_exit();
     let configuration = init_config_or_exit(params.config_file);
+
     init_logger(&configuration);
 
-    rpc_server::RpcServer::run_threaded();
-
     let manager = init_unit_manager_or_exit(&configuration);
+
+    match init_rpc_server_or_exit(&configuration, manager.clone()) {
+        Some(rpc_server) => {
+            rpc_server.run_threaded();
+        },
+        None => {}
+    }
+
     unit::Runner::run(manager.clone());
 }

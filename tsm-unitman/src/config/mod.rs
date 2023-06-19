@@ -12,3 +12,6 @@ pub use unit::Unit;
 
 mod process_probe;
 pub use process_probe::ProcessProbe;
+
+mod rpc_server;
+pub use rpc_server::RpcServer;

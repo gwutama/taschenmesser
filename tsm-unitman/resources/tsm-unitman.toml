@@ -1,9 +1,9 @@
 [application]
 log_level = "debug"                     # Optional. Defaults to "info". Possible values: "debug", "info", "warn", "error", "trace".
 
-[server]
-enabled = true                              # Optional. Defaults to false.
-address = "ipc:///var/run/tsm-unitman.sock" # Optional. Defaults to "ipc:///var/run/tsm-unitman.sock".
+[rpc_server]
+enabled = true                                      # Optional. Defaults to false.
+bind_address = "ipc:///tmp/tsm-unitman.sock"    # Optional. Defaults to "ipc:///tmp/tsm-unitman.sock".
 
 [[units]]
 name = "foo"                            # Mandatory
