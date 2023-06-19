@@ -1,12 +1,11 @@
 use std::thread;
-use std::time::Duration;
 use log::{debug};
 use protobuf::Message;
 
 use unit::ManagerRef;
 
 include!(concat!(env!("OUT_DIR"), "/protos/mod.rs"));
-use tsm_unitman_rpc::{RpcRequest, RpcResponse, AckRequest, AckResponse};
+use tsm_unitman_rpc::{RpcRequest, RpcResponse, AckResponse};
 use crate::unit;
 
 
@@ -24,34 +23,31 @@ impl RpcServer {
         }
     }
 
-    pub fn run_threaded(&self) -> thread::JoinHandle<()> {
+    pub fn run_threaded(self) -> thread::JoinHandle<()> {
         debug!("Spawning thread");
-
-        let thread_handle = thread::spawn(move || {
-            Self::run();
-        });
-
-        return thread_handle;
+        thread::spawn(move || {
+            self.run();
+        })
     }
 
-    fn run() {
+    fn run(self) {
         let context = zmq::Context::new();
         let responder = context.socket(zmq::REP).unwrap();
 
-        assert!(responder.bind("ipc:///tmp/tsm-unitman.sock").is_ok());
+        assert!(responder.bind(self.bind_address.as_str()).is_ok());
 
         loop {
             // https://github.com/pronebird/node-rust-zeromq/blob/master/server/src/main.rs
             let request: Option<RpcRequest> = match responder.recv_bytes(0) {
                 Ok(bytes) => Some(Message::parse_from_bytes(&bytes).unwrap()),
-                Err(e) => None,
+                Err(_) => None,
             };
 
             // handle request
             let response: Option<RpcResponse> = match request {
                 Some(request) => {
                     debug!("Received request: {:?}", request);
-                    Some(Self::handle_request(&request))
+                    Some(self.handle_request(&request))
                 },
                 None => None,
             };
@@ -67,7 +63,7 @@ impl RpcServer {
         }
     }
 
-    fn handle_request(request: &RpcRequest) -> RpcResponse {
+    fn handle_request(&self, request: &RpcRequest) -> RpcResponse {
         let method_name: &str = request.method.as_str();
         let data = &request.data;
 

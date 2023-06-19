@@ -42,7 +42,7 @@ fn init_config_or_exit(config_file: String) -> config::Configuration {
 
 
 fn init_logger(configuration: &config::Configuration) {
-    let mut log_level = configuration.application.get_log_level();
+    let log_level = configuration.application.get_log_level();
     let env = env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV,
                                                    log_level.to_string());
     env_logger::init_from_env(env);
@@ -82,20 +82,6 @@ fn init_unit_manager_or_exit(configuration: &config::Configuration) -> unit::Man
 }
 
 
-fn init_rpc_server_or_exit(
-    configuration: &config::Configuration,
-    unit_manager: unit::ManagerRef,
-    ) -> Option<rpc_server::RpcServer> {
-    if configuration.rpc_server.is_enabled() {
-        let bind_address = configuration.rpc_server.get_bind_address();
-        return Some(rpc_server::RpcServer::new(unit_manager.clone(),
-                                               bind_address.clone()));
-    }
-
-    None
-}
-
-
 fn main() {
     let params = parse_args_or_exit();
     let configuration = init_config_or_exit(params.config_file);
@@ -104,11 +90,11 @@ fn main() {
 
     let manager = init_unit_manager_or_exit(&configuration);
 
-    match init_rpc_server_or_exit(&configuration, manager.clone()) {
-        Some(rpc_server) => {
-            rpc_server.run_threaded();
-        },
-        None => {}
+    if configuration.rpc_server.is_enabled() {
+        rpc_server::RpcServer::new(
+            manager.clone(),
+            configuration.rpc_server.get_bind_address()
+        ).run_threaded();
     }
 
     unit::Runner::run(manager.clone());

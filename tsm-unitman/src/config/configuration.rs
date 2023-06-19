@@ -29,7 +29,7 @@ impl Configuration {
 
     pub fn from_string(content: String) -> Result<Configuration, String> {
         return match toml::from_str(&content) {
-            Ok(mut configuration) => {
+            Ok(configuration) => {
                 Ok(configuration)
             },
             Err(error) => {
