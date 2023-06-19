@@ -42,17 +42,9 @@ fn init_config_or_exit(config_file: String) -> config::Configuration {
 
 
 fn init_logger(configuration: &config::Configuration) {
-    let mut log_level_to_use = config::LogLevel::Info;
-
-    match &configuration.application.log_level {
-        Some(level) => {
-            log_level_to_use = level.clone();
-        },
-        None => {}
-    }
-
+    let mut log_level = configuration.application.get_log_level();
     let env = env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV,
-                                                   log_level_to_use.to_string());
+                                                   log_level.to_string());
     env_logger::init_from_env(env);
 }
 
@@ -94,22 +86,10 @@ fn init_rpc_server_or_exit(
     configuration: &config::Configuration,
     unit_manager: unit::ManagerRef,
     ) -> Option<rpc_server::RpcServer> {
-
-    // TODO: Move setting defaults to config::rpc_server?
-    // enabled: defaults to true
-    // bind_address: defaults to "ipc:///tmp/tsm-unitman.sock"
-    let enabled = match configuration.rpc_server.enabled {
-        Some(enabled) => { enabled },
-        None => { true }
-    };
-
-    let bind_address = match configuration.rpc_server.bind_address.clone() {
-        Some(address) => { address },
-        None => { "ipc:///tmp/tsm-unitman.sock".to_string() }
-    };
-
-    if enabled {
-        return Some(rpc_server::RpcServer::new(unit_manager.clone()));
+    if configuration.rpc_server.is_enabled() {
+        let bind_address = configuration.rpc_server.get_bind_address();
+        return Some(rpc_server::RpcServer::new(unit_manager.clone(),
+                                               bind_address.clone()));
     }
 
     None

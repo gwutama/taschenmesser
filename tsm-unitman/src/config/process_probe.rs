@@ -14,27 +14,28 @@ pub struct ProcessProbe {
 
 
 impl ProcessProbe {
+    pub fn get_executable(&self) -> String {
+        return self.executable.clone();
+    }
+
+    pub fn get_arguments(&self) -> Vec<String> {
+        return self.arguments.clone().unwrap_or(Vec::new());
+    }
+
+    pub fn get_timeout_s(&self) -> i32 {
+        return self.timeout_s.unwrap_or(10);
+    }
+
+    pub fn get_interval_s(&self) -> i32 {
+        return self.interval_s.unwrap_or(60);
+    }
+
     pub fn build_ref(&self) -> unit::ProcessProbeRef {
-        let arguments = match &self.arguments {
-            Some(arguments) => arguments.clone(),
-            None => Vec::new(),
-        };
-
-        let timeout_s = match &self.timeout_s {
-            Some(timeout_s) => *timeout_s,
-            None => 10,
-        };
-
-        let interval_s = match &self.interval_s {
-            Some(interval_s) => *interval_s,
-            None => 60,
-        };
-
         return unit::ProcessProbe::new_ref(
-            self.executable.clone(),
-            arguments,
-            timeout_s,
-            interval_s,
+            self.get_executable(),
+            self.get_arguments(),
+            self.get_timeout_s(),
+            self.get_interval_s(),
         );
     }
 }

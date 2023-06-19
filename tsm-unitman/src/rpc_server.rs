@@ -12,13 +12,15 @@ use crate::unit;
 
 pub struct RpcServer {
     unit_manager: ManagerRef,
+    bind_address: String,
 }
 
 
 impl RpcServer {
-    pub fn new(unit_manager: ManagerRef) -> Self {
+    pub fn new(unit_manager: ManagerRef, bind_address: String) -> Self {
         Self {
             unit_manager,
+            bind_address,
         }
     }
 

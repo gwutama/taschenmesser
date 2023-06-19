@@ -29,7 +29,7 @@ impl Configuration {
 
     pub fn from_string(content: String) -> Result<Configuration, String> {
         return match toml::from_str(&content) {
-            Ok(configuration) => {
+            Ok(mut configuration) => {
                 Ok(configuration)
             },
             Err(error) => {
@@ -61,37 +61,32 @@ impl Configuration {
         }
 
         for unit_configuration in &self.units {
-            let unit_ref = match unit_map.get(&unit_configuration.name) {
+            let unit_ref = match unit_map.get(&unit_configuration.get_name()) {
                 Some(unit_ref) => unit_ref,
                 None => {
-                    warn!("Unit {} not found in unit map", unit_configuration.name);
+                    warn!("Unit {} not found in unit map", unit_configuration.get_name());
                     continue;
                 }
             };
 
             // build dependencies
-            match &unit_configuration.dependencies {
-                Some(dependencies) => {
-                    for dependency_name in dependencies {
-                        let dependency_unit_ref = match unit_map.get(dependency_name) {
-                            Some(unit_ref) => unit_ref,
-                            None => {
-                                warn!("Dependency {} not found in unit map", dependency_name);
-                                continue;
-                            }
-                        };
-
-                        match unit_ref.lock() {
-                            Ok(mut unit) => {
-                                unit.add_dependency(dependency_unit_ref.clone());
-                            },
-                            Err(e) => {
-                                error!("Error acquiring lock while building dependency for unit: {}", e);
-                            }
-                        };
+            for dependency_name in unit_configuration.get_dependencies() {
+                let dependency_unit_ref = match unit_map.get(&dependency_name) {
+                    Some(unit_ref) => unit_ref,
+                    None => {
+                        warn!("Dependency {} not found in unit map", dependency_name);
+                        continue;
                     }
-                },
-                None => {}
+                };
+
+                match unit_ref.lock() {
+                    Ok(mut unit) => {
+                        unit.add_dependency(dependency_unit_ref.clone());
+                    },
+                    Err(e) => {
+                        error!("Error acquiring lock while building dependency for unit: {}", e);
+                    }
+                };
             }
         }
 
@@ -109,6 +104,10 @@ mod tests {
             r#"
                 [application]
                 log_level = "debug"
+
+                [rpc_server]
+                enabled = true
+                bind_address = "ipc:///tmp/tsm-unitman.sock"
 
                 [[units]]
                 name = "foo"
@@ -146,6 +145,8 @@ mod tests {
             r#"
                 [application]
 
+                [rpc_server]
+
                 [[units]]
                 name = "foo"
                 executable = "ls"
@@ -173,7 +174,7 @@ mod tests {
         let content= sample_working_complete_conf();
         let configuration = Configuration::from_string(content).unwrap();
 
-        assert_eq!(configuration.application.log_level.unwrap(), LogLevel::Debug);
+        assert_eq!(configuration.application.get_log_level(), LogLevel::Debug);
         assert_eq!(configuration.units.len(), 2);
     }
 
@@ -182,7 +183,7 @@ mod tests {
         let content= sample_working_mandatory_only_conf();
         let configuration = Configuration::from_string(content).unwrap();
 
-        assert_eq!(configuration.application.log_level, None);
+        assert_eq!(configuration.application.get_log_level(), LogLevel::Info);
     }
 
     #[test]
@@ -190,7 +191,7 @@ mod tests {
         let file = String::from("resources/tsm-unitman.toml");
         let configuration = Configuration::from_file(file).unwrap();
 
-        assert_eq!(configuration.application.log_level.unwrap(), LogLevel::Debug);
+        assert_eq!(configuration.application.get_log_level(), LogLevel::Debug);
         assert_eq!(configuration.units.len(), 2);
     }
 
@@ -212,7 +213,7 @@ mod tests {
         assert_eq!(units.len(), 2);
         assert_eq!(units[0].lock().unwrap().name(), "foo");
         assert_eq!(units[1].lock().unwrap().name(), "bar");
-        assert_eq!(units[1].lock().unwrap().dependencies().len(), 1);
-        assert_eq!(units[1].lock().unwrap().dependencies()[0].lock().unwrap().name(), "foo");
+        assert_eq!(units[1].lock().unwrap().get_dependencies().len(), 1);
+        assert_eq!(units[1].lock().unwrap().get_dependencies()[0].lock().unwrap().name(), "foo");
     }
 }
