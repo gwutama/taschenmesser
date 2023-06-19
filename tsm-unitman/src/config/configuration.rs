@@ -9,8 +9,8 @@ use crate::unit;
 
 #[derive(Deserialize, Debug)]
 pub struct Configuration {
-    pub application: Application,
-    pub rpc_server: RpcServer,
+    application: Application,
+    rpc_server: RpcServer,
     units: Vec<Unit>,
 }
 
@@ -36,6 +36,14 @@ impl Configuration {
                 Err(format!("Error parsing configuration file: {}", error))
             }
         }
+    }
+
+    pub fn get_application(&self) -> &Application {
+        return &self.application;
+    }
+
+    pub fn get_rpc_server(&self) -> &RpcServer {
+        return &self.rpc_server;
     }
 
     pub fn build_units(&self) -> Vec<unit::UnitRef> {

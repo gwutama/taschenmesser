@@ -42,7 +42,7 @@ fn init_config_or_exit(config_file: String) -> config::Configuration {
 
 
 fn init_logger(configuration: &config::Configuration) {
-    let log_level = configuration.application.get_log_level();
+    let log_level = configuration.get_application().get_log_level();
     let env = env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV,
                                                    log_level.to_string());
     env_logger::init_from_env(env);
@@ -90,10 +90,10 @@ fn main() {
 
     let manager = init_unit_manager_or_exit(&configuration);
 
-    if configuration.rpc_server.is_enabled() {
+    if configuration.get_rpc_server().is_enabled() {
         rpc_server::RpcServer::new(
             manager.clone(),
-            configuration.rpc_server.get_bind_address()
+            configuration.get_rpc_server().get_bind_address()
         ).run_threaded();
     }
 
