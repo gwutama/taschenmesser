@@ -125,23 +125,23 @@ impl Runner {
 
         match manager_lock {
             Ok(manager) => {
-                let units = manager.units().clone();
+                let units = manager.get_units().clone();
 
                 for unit in units {
                     match unit.lock() {
                         Ok(mut unit) => {
                             unit.liveness_probe();
 
-                            if !unit.test_running() && *unit.restart_policy() == RestartPolicy::Always {
-                                debug!("Unit {} is not running, restarting because restart policy was set to Always.", unit.name());
+                            if !unit.test_running() && unit.get_restart_policy() == RestartPolicy::Always {
+                                debug!("Unit {} is not running, restarting because restart policy was set to Always.", unit.get_name());
                                 let start_result = unit.start();
 
                                 match start_result {
                                     Ok(_) => {
-                                        debug!("Unit {} restarted", unit.name());
+                                        debug!("Unit {} restarted", unit.get_name());
                                     }
                                     Err(e) => {
-                                        warn!("Error restarting unit {}: {}", unit.name(), e);
+                                        warn!("Error restarting unit {}: {}", unit.get_name(), e);
                                     }
                                 }
                             }

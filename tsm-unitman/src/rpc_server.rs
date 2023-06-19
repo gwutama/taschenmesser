@@ -1,11 +1,13 @@
 use std::thread;
-use log::{debug};
-use protobuf::Message;
+use log::{debug, warn};
+use protobuf::{EnumOrUnknown, Message};
 
 use unit::ManagerRef;
 
 include!(concat!(env!("OUT_DIR"), "/protos/mod.rs"));
-use tsm_unitman_rpc::{RpcRequest, RpcResponse, AckResponse};
+use tsm_unitman_rpc::{RpcRequest, RpcResponse, RpcMethod,
+                      AckRequest, AckResponse,
+                      ListUnitsRequest, ListUnitsResponse};
 use crate::unit;
 
 
@@ -16,6 +18,7 @@ pub struct RpcServer {
 
 
 impl RpcServer {
+    /// TODO: Move to library
     pub fn new(unit_manager: ManagerRef, bind_address: String) -> Self {
         Self {
             unit_manager,
@@ -23,6 +26,7 @@ impl RpcServer {
         }
     }
 
+    /// TODO: Move to library
     pub fn run_threaded(self) -> thread::JoinHandle<()> {
         debug!("Spawning thread");
         thread::spawn(move || {
@@ -30,9 +34,16 @@ impl RpcServer {
         })
     }
 
+    /// TODO: Move to library
     fn run(self) {
         let context = zmq::Context::new();
-        let responder = context.socket(zmq::REP).unwrap();
+        let responder = match context.socket(zmq::REP) {
+            Ok(socket) => socket,
+            Err(error) => {
+                warn!("Failed to create socket: {}", error);
+                return;
+            },
+        };
 
         assert!(responder.bind(self.bind_address.as_str()).is_ok());
 
@@ -47,7 +58,7 @@ impl RpcServer {
             let response: Option<RpcResponse> = match request {
                 Some(request) => {
                     debug!("Received request: {:?}", request);
-                    Some(self.handle_request(&request))
+                    Some(self.handle_request(request))
                 },
                 None => None,
             };
@@ -55,41 +66,166 @@ impl RpcServer {
             match response {
                 Some(response) => {
                     debug!("Sending response: {:?}", response);
-                    let message = response.write_to_bytes().unwrap();
-                    responder.send(&message, 0).unwrap();
+
+                    let message = match response.write_to_bytes() {
+                        Ok(bytes) => bytes,
+                        Err(error) => {
+                            warn!("Failed to serialize response: {}", error);
+                            continue;
+                        },
+                    };
+
+                    match responder.send(&message, 0) {
+                        Ok(_) => (),
+                        Err(error) => {
+                            warn!("Failed to send response: {}", error);
+                            continue;
+                        },
+                    };
                 },
                 None => (),
             }
         }
     }
 
-    fn handle_request(&self, request: &RpcRequest) -> RpcResponse {
-        let method_name: &str = request.method.as_str();
-        let data = &request.data;
+    /// TODO: Move to library. Use trait.
+    fn handle_request(&self, request: RpcRequest) -> RpcResponse {
+        // Handle request based on method
+        match request.method.enum_value_or_default() {
+            RpcMethod::Ack => self.handle_ack(request),
+            RpcMethod::ListUnits => self.handle_list_units(request),
+            _ => self.handle_unknown(),
+        }
+    }
 
+    fn handle_unknown(&self) -> RpcResponse {
+        warn!("Cannot handle unknown method");
         let mut rpc_response = RpcResponse::new();
-        rpc_response.method = method_name.to_string();
+        rpc_response.method = EnumOrUnknown::from(RpcMethod::Unknown);
+        rpc_response.status = false;
+        rpc_response.error = format!("Unknown method");
+        return rpc_response;
+    }
 
-        let result = match method_name {
-            ".rpc.Service.ack" => {
-                let mut ack = AckResponse::new();
-                ack.message = "pong".to_string();
-                Ok(ack)
+    fn handle_ack(&self, request: RpcRequest) -> RpcResponse {
+        let mut rpc_response = RpcResponse::new();
+
+        let ack_request: AckRequest = match Message::parse_from_bytes(&request.data) {
+            Ok(request) => {
+                rpc_response.method = EnumOrUnknown::from(RpcMethod::Ack);
+                request
             },
-            _ => Err("Unknown method"),
+            Err(error) => {
+                warn!("Failed to parse ack request: {}", error);
+                rpc_response.method = EnumOrUnknown::from(RpcMethod::Ack);
+                rpc_response.status = false;
+                rpc_response.error = format!("Failed to parse ack request: {}", error);
+                return rpc_response;
+            },
         };
 
-        match result {
-            Ok(response) => {
+        debug!("Received ack request: {}", ack_request.message);
+
+        let mut ack_response = AckResponse::new();
+        ack_response.message = "pong".to_string();
+
+        match ack_response.write_to_bytes() {
+            Ok(bytes) => {
                 rpc_response.status = true;
-                rpc_response.data = response.write_to_bytes().unwrap();
+                rpc_response.data = bytes;
             },
-            Err(e) => {
+            Err(error) => {
                 rpc_response.status = false;
-                rpc_response.error = e.to_string();
-            }
+                rpc_response.error = format!("Failed to serialize ack response: {}", error);
+            },
         }
 
         return rpc_response;
+    }
+
+    fn handle_list_units(&self, request: RpcRequest) -> RpcResponse {
+        let mut rpc_response = RpcResponse::new();
+
+        let _list_units_request: ListUnitsRequest = match Message::parse_from_bytes(&request.data) {
+            Ok(request) => {
+                rpc_response.method = EnumOrUnknown::from(RpcMethod::ListUnits);
+                request
+            },
+            Err(error) => {
+                warn!("Failed to parse list units request: {}", error);
+                rpc_response.method = EnumOrUnknown::from(RpcMethod::ListUnits);
+                rpc_response.status = false;
+                rpc_response.error = format!("Failed to parse list units request: {}", error);
+                return rpc_response;
+            },
+        };
+
+        debug!("Received list units request");
+
+        let mut list_units_response = ListUnitsResponse::new();
+
+        match self.unit_manager.lock() {
+            Ok(unit_manager) => {
+                list_units_response.units = self.convert_units_to_proto(&unit_manager.get_units())
+            },
+            Err(error) => {
+                rpc_response.status = false;
+                rpc_response.error = format!("Failed to lock unit manager: {}", error);
+                return rpc_response;
+            },
+        }
+
+        match list_units_response.write_to_bytes() {
+            Ok(bytes) => {
+                rpc_response.status = true;
+                rpc_response.data = bytes;
+            },
+            Err(error) => {
+                rpc_response.status = false;
+                rpc_response.error = format!("Failed to serialize list units response: {}", error);
+            },
+        }
+
+        return rpc_response;
+    }
+
+    /// TODO: Move to rpc_server::Converter
+    fn convert_units_to_proto(&self, units: &Vec<unit::UnitRef>) -> Vec<tsm_unitman_rpc::Unit> {
+        let mut proto_units = Vec::new();
+        for unit in units {
+            match self.convert_unit_to_proto(unit) {
+                Ok(proto_unit) => proto_units.push(proto_unit),
+                Err(error) => warn!("{}", error),
+            }
+        }
+        proto_units
+    }
+
+    /// TODO: Move to rpc_server::Converter
+    fn convert_unit_to_proto(&self, unit: &unit::UnitRef) -> Result<tsm_unitman_rpc::Unit, String> {
+        match unit.lock() {
+            Ok(mut unit) => {
+                let mut proto_unit = tsm_unitman_rpc::Unit::new();
+
+                proto_unit.name = unit.get_name().clone();
+                proto_unit.executable = unit.get_executable().clone();
+                proto_unit.arguments = unit.get_arguments().clone();
+                proto_unit.restart_policy = EnumOrUnknown::from_i32(unit.get_restart_policy().clone() as i32);
+                proto_unit.uid = unit.get_uid() as i32;
+                proto_unit.gid = unit.get_gid() as i32;
+                proto_unit.enabled = unit.is_enabled();
+                proto_unit.probe_state = EnumOrUnknown::from_i32(unit.get_probe_state().clone() as i32);
+
+                match unit.get_pid() {
+                    Some(pid) => proto_unit.pid = pid as i32,
+                    None => proto_unit.pid = -1,
+                }
+
+                Ok(proto_unit)
+            },
+            Err(_) => {
+                return Err("Failed to lock unit".to_string());
+            },
+        }
     }
 }

@@ -60,7 +60,7 @@ impl Configuration {
 
             match unit_ref.lock() {
                 Ok(unit) => {
-                    unit_map.insert(unit.name().clone(), unit_ref.clone());
+                    unit_map.insert(unit.get_name().clone(), unit_ref.clone());
                 },
                 Err(e) => {
                     error!("Error acquiring lock while building unit ref: {}", e);
@@ -219,9 +219,9 @@ mod tests {
         let units = configuration.build_units();
 
         assert_eq!(units.len(), 2);
-        assert_eq!(units[0].lock().unwrap().name(), "foo");
-        assert_eq!(units[1].lock().unwrap().name(), "bar");
+        assert_eq!(units[0].lock().unwrap().get_name(), "foo");
+        assert_eq!(units[1].lock().unwrap().get_name(), "bar");
         assert_eq!(units[1].lock().unwrap().get_dependencies().len(), 1);
-        assert_eq!(units[1].lock().unwrap().get_dependencies()[0].lock().unwrap().name(), "foo");
+        assert_eq!(units[1].lock().unwrap().get_dependencies()[0].lock().unwrap().get_name(), "foo");
     }
 }

@@ -30,7 +30,7 @@ impl Manager {
         self.units.push(unit);
     }
 
-    pub fn units(&self) -> &Vec<UnitRef> {
+    pub fn get_units(&self) -> &Vec<UnitRef> {
         &self.units
     }
 
@@ -62,10 +62,10 @@ impl Manager {
                 Ok(mut unit) => {
                     match unit.start() {
                         Ok(_) => {
-                            debug!("Started unit {}", unit.name());
+                            debug!("Started unit {}", unit.get_name());
                         }
                         Err(e) => {
-                            warn!("Error starting unit {}: {}", unit.name(), e);
+                            warn!("Error starting unit {}: {}", unit.get_name(), e);
                         }
                     }
                 }
@@ -84,10 +84,10 @@ impl Manager {
                 Ok(mut unit) => {
                     match unit.stop() {
                         Ok(_) => {
-                            debug!("Stopped unit {}", unit.name());
+                            debug!("Stopped unit {}", unit.get_name());
                         }
                         Err(e) => {
-                            warn!("Error stopping unit {}: {}", unit.name(), e);
+                            warn!("Error stopping unit {}: {}", unit.get_name(), e);
                         }
                     }
                 }

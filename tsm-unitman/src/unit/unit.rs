@@ -76,6 +76,18 @@ impl Unit {
         )))
     }
 
+    pub fn get_name(&self) -> String {
+        return self.name.clone();
+    }
+
+    pub fn get_executable(&self) -> String {
+        return self.executable.clone();
+    }
+
+    pub fn get_arguments(&self) -> Vec<String> {
+        return self.arguments.clone();
+    }
+
     pub fn add_dependency(&mut self, unit: UnitRef) {
         self.dependencies.push(unit);
     }
@@ -84,19 +96,35 @@ impl Unit {
         return &self.dependencies;
     }
 
-    pub fn name(&self) -> &String {
-        return &self.name;
+    pub fn get_restart_policy(&self) -> RestartPolicy {
+        return self.restart_policy.clone();
     }
 
-    pub fn restart_policy(&self) -> &RestartPolicy {
-        return &self.restart_policy;
+    pub fn get_uid(&self) -> u32 {
+        return self.uid;
+    }
+
+    pub fn get_gid(&self) -> u32 {
+        return self.gid;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        return self.enabled;
+    }
+
+    pub fn get_liveness_probe(&self) -> Option<ProcessProbeRef> {
+        return self.liveness_probe.clone();
+    }
+
+    pub fn get_probe_state(&self) -> ProbeState {
+        return self.probe_state.clone();
     }
 
     /// A unit is running if its pid exists
     pub fn test_running(&mut self) -> bool {
         return match self.child {
             Some(ref _child) => {
-                match self.pid() {
+                match self.get_pid() {
                     Some(_pid) => {
                         true
                     }
@@ -115,7 +143,7 @@ impl Unit {
 
     /// Returns the Process ID (PID) of a child process, if it exists
     /// We also check whether the process is still alive.
-    pub fn pid(&mut self) -> Option<u32> {
+    pub fn get_pid(&mut self) -> Option<u32> {
         return match self.child {
             Some(ref mut child) => {
                 // Check whether we have exit code, which means that the process was exited
@@ -372,7 +400,7 @@ mod tests {
     fn new_returns_correct_name() {
         let unit = build_unit();
 
-        assert_eq!(unit.name(), "test");
+        assert_eq!(unit.get_name(), "test");
     }
 
     #[test]
@@ -380,7 +408,7 @@ mod tests {
         let mut unit = build_unit();
 
         unit.start().unwrap();
-        assert_ne!(unit.pid(), None);
+        assert_ne!(unit.get_pid(), None);
     }
 
     #[test]

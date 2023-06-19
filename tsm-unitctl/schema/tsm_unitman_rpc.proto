@@ -2,21 +2,22 @@ syntax = "proto3";
 
 package TsmUnitmanRpc;
 
+enum RpcMethod {
+  Unknown = 0;
+  Ack = 1;
+  ListUnits = 2;
+}
+
 message RpcRequest {
-  string method = 1;
+  RpcMethod method = 1;
   bytes data = 2;
 }
 
 message RpcResponse {
-  string method = 1;
+  RpcMethod method = 1;
   bytes data = 2;
   bool status = 3;
   string error = 4;
-}
-
-service Service {
-  rpc ack (AckRequest) returns (AckResponse);
-  rpc list (ListRequest) returns (ListResponse);
 }
 
 message AckRequest {
@@ -27,24 +28,23 @@ message AckResponse {
   string message = 1;
 }
 
-message ListRequest {
-  string message = 1;
+message ListUnitsRequest {
 }
 
-message ListResponse {
+message ListUnitsResponse {
   repeated Unit units = 1;
 }
 
 message Unit {
-  optional string name = 1;
-  optional string executable = 2;
+  string name = 1;
+  string executable = 2;
   repeated string arguments = 3;
-  optional RestartPolicy restart_policy = 4;
-  optional int32 uid = 5;
-  optional int32 gid = 6;
-  optional bool enabled = 7;
-  optional ProbeState probe_state = 8;
-  optional int32 pid = 9;
+  RestartPolicy restart_policy = 4;
+  int32 uid = 5;
+  int32 gid = 6;
+  bool enabled = 7;
+  ProbeState probe_state = 8;
+  int32 pid = 9;
 
   enum RestartPolicy {
     Always = 0;
