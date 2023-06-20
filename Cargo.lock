@@ -713,6 +713,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tsm-ipc"
+version = "0.1.0"
+dependencies = [
+ "protobuf",
+ "protobuf-codegen",
+]
+
+[[package]]
 name = "tsm-unitctl"
 version = "0.1.0"
 dependencies = [
@@ -734,10 +742,10 @@ dependencies = [
  "log",
  "process_control",
  "protobuf",
- "protobuf-codegen",
  "serde",
  "sysinfo",
  "toml",
+ "tsm-ipc",
  "users",
  "zmq",
 ]

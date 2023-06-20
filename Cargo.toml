@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "tsm-ipc",
     "tsm-unitman",
     "tsm-unitctl",
 ]
