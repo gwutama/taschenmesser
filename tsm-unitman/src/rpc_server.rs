@@ -1,8 +1,8 @@
-use std::thread;
+use std::sync::{Arc, Mutex};
 use log::{debug, warn};
-use protobuf::{EnumOrUnknown, Message};
+use protobuf::{EnumOrUnknown, Message, Enum};
 
-use tsm_ipc::tsm_unitman_rpc;
+use tsm_ipc::{tsm_common_rpc, tsm_unitman_rpc};
 
 use crate::unit;
 
@@ -10,110 +10,79 @@ use crate::unit;
 pub struct RpcServer {
     unit_manager: unit::ManagerRef,
     bind_address: String,
+    rpc_server: tsm_ipc::RpcServer,
 }
 
 
 impl RpcServer {
-    /// TODO: Move to library
     pub fn new(unit_manager: unit::ManagerRef, bind_address: String) -> Self {
+        let request_handler = Arc::new(Mutex::new(
+            ResponseHandler::new(unit_manager.clone())
+        ));
+        let rpc_server = tsm_ipc::RpcServer::new(bind_address.clone(), request_handler);
+
         Self {
             unit_manager,
             bind_address,
+            rpc_server,
         }
     }
 
-    /// TODO: Move to library
-    pub fn run_threaded(self) -> thread::JoinHandle<()> {
-        debug!("Spawning thread");
-        thread::spawn(move || {
-            self.run();
-        })
+    pub fn run_threaded(self) {
+        self.rpc_server.run_threaded();
     }
+}
 
-    /// TODO: Move to library
-    fn run(self) {
-        let context = zmq::Context::new();
-        let responder = match context.socket(zmq::REP) {
-            Ok(socket) => socket,
-            Err(error) => {
-                warn!("Failed to create socket: {}", error);
-                return;
-            },
+
+struct ResponseHandler {
+    unit_manager: unit::ManagerRef,
+}
+
+
+impl tsm_ipc::RpcRequestHandler for ResponseHandler {
+    fn handle_request(&self, request: tsm_common_rpc::RpcRequest) -> tsm_common_rpc::RpcResponse {
+        let request_method= match tsm_unitman_rpc::RpcMethod::from_i32(request.method) {
+            Some(method) => method,
+            None => tsm_unitman_rpc::RpcMethod::Unknown,
         };
 
-        assert!(responder.bind(self.bind_address.as_str()).is_ok());
-
-        loop {
-            // https://github.com/pronebird/node-rust-zeromq/blob/master/server/src/main.rs
-            let request: Option<tsm_unitman_rpc::RpcRequest> = match responder.recv_bytes(0) {
-                Ok(bytes) => Some(Message::parse_from_bytes(&bytes).unwrap()),
-                Err(_) => None,
-            };
-
-            // handle request
-            let response: Option<tsm_unitman_rpc::RpcResponse> = match request {
-                Some(request) => {
-                    debug!("Received request: {:?}", request);
-                    Some(self.handle_request(request))
-                },
-                None => None,
-            };
-
-            match response {
-                Some(response) => {
-                    debug!("Sending response: {:?}", response);
-
-                    let message = match response.write_to_bytes() {
-                        Ok(bytes) => bytes,
-                        Err(error) => {
-                            warn!("Failed to serialize response: {}", error);
-                            continue;
-                        },
-                    };
-
-                    match responder.send(&message, 0) {
-                        Ok(_) => (),
-                        Err(error) => {
-                            warn!("Failed to send response: {}", error);
-                            continue;
-                        },
-                    };
-                },
-                None => (),
-            }
-        }
-    }
-
-    /// TODO: Move to library. Use trait.
-    fn handle_request(&self, request: tsm_unitman_rpc::RpcRequest) -> tsm_unitman_rpc::RpcResponse {
         // Handle request based on method
-        match request.method.enum_value_or_default() {
+        match request_method {
             tsm_unitman_rpc::RpcMethod::Ack => self.handle_ack(request),
             tsm_unitman_rpc::RpcMethod::ListUnits => self.handle_list_units(request),
             _ => self.handle_unknown(),
         }
     }
+}
 
-    fn handle_unknown(&self) -> tsm_unitman_rpc::RpcResponse {
+
+impl ResponseHandler {
+    pub fn new(unit_manager: unit::ManagerRef) -> Self {
+        Self {
+            unit_manager,
+        }
+    }
+
+    fn handle_unknown(&self) -> tsm_common_rpc::RpcResponse {
         warn!("Cannot handle unknown method");
-        let mut rpc_response = tsm_unitman_rpc::RpcResponse::new();
-        rpc_response.method = EnumOrUnknown::from(tsm_unitman_rpc::RpcMethod::Unknown);
+        let mut rpc_response = tsm_common_rpc::RpcResponse::new();
+        rpc_response.method = tsm_unitman_rpc::RpcMethod::Unknown.value();
         rpc_response.status = false;
         rpc_response.error = format!("Unknown method");
         return rpc_response;
     }
 
-    fn handle_ack(&self, request: tsm_unitman_rpc::RpcRequest) -> tsm_unitman_rpc::RpcResponse {
-        let mut rpc_response = tsm_unitman_rpc::RpcResponse::new();
+    fn handle_ack(&self, request: tsm_common_rpc::RpcRequest) -> tsm_common_rpc::RpcResponse {
+        let mut rpc_response = tsm_common_rpc::RpcResponse::new();
 
         let ack_request: tsm_unitman_rpc::AckRequest = match Message::parse_from_bytes(&request.data) {
             Ok(request) => {
-                rpc_response.method = EnumOrUnknown::from(tsm_unitman_rpc::RpcMethod::Ack);
+                rpc_response.method = tsm_unitman_rpc::RpcMethod::Ack.value();
                 request
             },
             Err(error) => {
                 warn!("Failed to parse ack request: {}", error);
-                rpc_response.method = EnumOrUnknown::from(tsm_unitman_rpc::RpcMethod::Ack);
+                rpc_response.method = tsm_unitman_rpc::RpcMethod::Ack.value();
                 rpc_response.status = false;
                 rpc_response.error = format!("Failed to parse ack request: {}", error);
                 return rpc_response;
@@ -139,17 +108,17 @@ impl RpcServer {
         return rpc_response;
     }
 
-    fn handle_list_units(&self, request: tsm_unitman_rpc::RpcRequest) -> tsm_unitman_rpc::RpcResponse {
-        let mut rpc_response = tsm_unitman_rpc::RpcResponse::new();
+    fn handle_list_units(&self, request: tsm_common_rpc::RpcRequest) -> tsm_common_rpc::RpcResponse {
+        let mut rpc_response = tsm_common_rpc::RpcResponse::new();
 
         let _list_units_request: tsm_unitman_rpc::ListUnitsRequest = match Message::parse_from_bytes(&request.data) {
             Ok(request) => {
-                rpc_response.method = EnumOrUnknown::from(tsm_unitman_rpc::RpcMethod::ListUnits);
+                rpc_response.method = tsm_unitman_rpc::RpcMethod::ListUnits.value();
                 request
             },
             Err(error) => {
                 warn!("Failed to parse list units request: {}", error);
-                rpc_response.method = EnumOrUnknown::from(tsm_unitman_rpc::RpcMethod::ListUnits);
+                rpc_response.method = tsm_unitman_rpc::RpcMethod::ListUnits.value();
                 rpc_response.status = false;
                 rpc_response.error = format!("Failed to parse list units request: {}", error);
                 return rpc_response;

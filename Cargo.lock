@@ -716,8 +716,10 @@ dependencies = [
 name = "tsm-ipc"
 version = "0.1.0"
 dependencies = [
+ "log",
  "protobuf",
  "protobuf-codegen",
+ "zmq",
 ]
 
 [[package]]
@@ -729,6 +731,7 @@ dependencies = [
  "log",
  "protobuf",
  "protobuf-codegen",
+ "tsm-ipc",
  "zmq",
 ]
 

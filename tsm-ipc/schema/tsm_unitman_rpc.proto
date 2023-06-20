@@ -8,18 +8,6 @@ enum RpcMethod {
   ListUnits = 2;
 }
 
-message RpcRequest {
-  RpcMethod method = 1;
-  bytes data = 2;
-}
-
-message RpcResponse {
-  RpcMethod method = 1;
-  bytes data = 2;
-  bool status = 3;
-  string error = 4;
-}
-
 message AckRequest {
   string message = 1;
 }

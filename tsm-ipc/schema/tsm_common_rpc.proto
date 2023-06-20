@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package TsmCommonRpc;
+
+message RpcRequest {
+  int32 method = 1;
+  bytes data = 2;
+}
+
+message RpcResponse {
+  int32 method = 1;
+  bytes data = 2;
+  bool status = 3;
+  string error = 4;
+}

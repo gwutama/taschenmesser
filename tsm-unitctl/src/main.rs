@@ -1,70 +1,96 @@
-include!(concat!(env!("OUT_DIR"), "/protos/mod.rs"));
-use tsm_unitman_rpc::{RpcRequest, RpcResponse, RpcMethod,
-                      AckRequest, AckResponse,
-                      ListUnitsRequest, ListUnitsResponse};
-use protobuf::{EnumOrUnknown, Message};
+use tsm_ipc::{tsm_unitman_rpc, tsm_common_rpc, RpcClient};
+use protobuf::{Message, Enum};
+use log::{debug, warn};
 
 const BIND_ADDRESS: &str = "ipc:///tmp/tsm-unitman.sock";
 
+// Interesting resource: https://github.com/erickt/rust-zmq/tree/master/examples/zguide
 fn main() {
-    // https://github.com/erickt/rust-zmq/tree/master/examples/zguide
-    let ctx = zmq::Context::new();
+    // init logger
+    let env = env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "debug");
+    env_logger::init_from_env(env);
 
-    let socket = ctx.socket(zmq::REQ).unwrap();
-    socket.connect(BIND_ADDRESS).unwrap();
-
-    match send_ack(&socket, String::from("ping")) {
-        Some(response) => {
-            let ack_response: AckResponse = Message::parse_from_bytes(&response.data).unwrap();
-            println!("Ack = Received response: {:?}", ack_response.message);
-        },
-        None => {
-            println!("Ack = No response received");
-        },
-    }
-
-    match send_list_units(&socket) {
-        Some(response) => {
-            let list_units_response: ListUnitsResponse = Message::parse_from_bytes(&response.data).unwrap();
-            println!("ListUnits = Received response: {:?}", list_units_response.units);
-        },
-        None => {
-            println!("ListUnits = No response received");
-        },
-    }
-
-    socket.disconnect(BIND_ADDRESS).unwrap();
-}
-
-
-fn send_ack(socket: &zmq::Socket, message: String) -> Option<RpcResponse> {
-    let mut ack_request = AckRequest::new();
-    ack_request.message = message;
-
-    let mut request = RpcRequest::new();
-    request.method = EnumOrUnknown::from(RpcMethod::Ack);
-    request.data = ack_request.write_to_bytes().unwrap();
-
-    return send_request(socket, request);
-}
-
-
-fn send_list_units(socket: &zmq::Socket) -> Option<RpcResponse> {
-    let mut request = RpcRequest::new();
-    request.method = EnumOrUnknown::from(RpcMethod::ListUnits);
-
-    return send_request(socket, request);
-}
-
-
-fn send_request(socket: &zmq::Socket, request: RpcRequest) -> Option<RpcResponse> {
-    let message = request.write_to_bytes().unwrap();
-    socket.send(&message, 0).unwrap();
-
-    let response: Option<RpcResponse> = match socket.recv_bytes(0) {
-        Ok(bytes) => Some(Message::parse_from_bytes(&bytes).unwrap()),
-        Err(e) => None,
+    match send_ack_request(String::from("ping")) {
+        Ok(ack_response) => debug!("Ack = Received response: {:?}", ack_response),
+        Err(error) => warn!("Ack = No response received: {}", error),
     };
 
-    return response;
+    match send_list_units_request() {
+        Ok(list_units_response) => debug!("ListUnits = Received response: {:?}", list_units_response.units),
+        Err(error) => warn!("ListUnits = No response received: {}", error),
+    };
+}
+
+
+fn send_ack_request(message: String) -> Result<tsm_unitman_rpc::AckResponse, String>{
+    let rpc = match RpcClient::new(String::from(BIND_ADDRESS)) {
+        Ok(rpc) => rpc,
+        Err(error) => panic!("Failed to create RPC client: {}", error),
+    };
+
+    let ack_request = build_ack_request(message);
+
+    let response = match rpc.send(ack_request) {
+        Ok(response) => response,
+        Err(error) => {
+            return Err(format!("Ack = No response received: {}", error));
+        },
+    };
+
+    // TODO: parse response.method, response.status and response.error too!
+    return match tsm_unitman_rpc::AckResponse::parse_from_bytes(&response.data) {
+        Ok(ack_response) => {
+            Ok(ack_response)
+        },
+        Err(error) => {
+            Err(format!("Failed to parse Ack response: {}", error))
+        }
+    };
+}
+
+
+fn build_ack_request(message: String) -> tsm_common_rpc::RpcRequest {
+    let mut ack_request = tsm_unitman_rpc::AckRequest::new();
+    ack_request.message = message;
+
+    let mut request = tsm_common_rpc::RpcRequest::new();
+    request.method = tsm_unitman_rpc::RpcMethod::Ack.value();
+    request.data = ack_request.write_to_bytes().unwrap();
+
+    request
+}
+
+
+fn send_list_units_request() -> Result<tsm_unitman_rpc::ListUnitsResponse, String> {
+    let rpc = match RpcClient::new(String::from(BIND_ADDRESS)) {
+        Ok(rpc) => rpc,
+        Err(error) => panic!("Failed to create RPC client: {}", error),
+    };
+
+    let unit_list_request = build_list_units_request();
+
+    let response = match rpc.send(unit_list_request) {
+        Ok(response) => response,
+        Err(error) => {
+            return Err(format!("ListUnits = No response received: {}", error));
+        },
+    };
+
+    // TODO: parse response.method, response.status and response.error too!
+    return match tsm_unitman_rpc::ListUnitsResponse::parse_from_bytes(&response.data) {
+        Ok(list_units_response) => {
+            Ok(list_units_response)
+        },
+        Err(error) => {
+            Err(format!("ListUnits = Failed to parse ListUnits response: {}", error))
+        }
+    };
+}
+
+
+fn build_list_units_request() -> tsm_common_rpc::RpcRequest {
+    let mut request = tsm_common_rpc::RpcRequest::new();
+    request.method = tsm_unitman_rpc::RpcMethod::ListUnits.value();
+
+    request
 }
