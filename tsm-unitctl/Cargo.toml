@@ -12,9 +12,9 @@ log = "0.4.19"
 env_logger = "0.10.0"
 zmq = "0.10.0"
 protobuf = "3.2.0"
+tabled = "0.12.2"
 
 [build-dependencies]
-protobuf-codegen = "3.2.0"
 
 [dev-dependencies]
 
