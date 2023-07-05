@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use sysinfo::{Pid, PidExt, ProcessRefreshKind, System, SystemExt};
 use log::{debug, warn, trace};
 
-use crate::unit::{RestartPolicy, ProcessProbeRef, ProbeState};
+use crate::unit::{RestartPolicy, LivenessProbeRef, ProbeState};
 
 
 pub type UnitRef = Arc<Mutex<Unit>>;
@@ -20,7 +20,7 @@ pub struct Unit {
     uid: u32,
     gid: u32,
     enabled: bool,
-    liveness_probe: Option<ProcessProbeRef>,
+    liveness_probe: Option<LivenessProbeRef>,
     child: Option<Box<Child>>,
     system_info: System,
     probe_state: ProbeState,
@@ -36,7 +36,7 @@ impl Unit {
         uid: u32,
         gid: u32,
         enabled: bool,
-        liveness_probe: Option<ProcessProbeRef>,
+        liveness_probe: Option<LivenessProbeRef>,
     ) -> Unit {
         Unit {
             name,
@@ -62,7 +62,7 @@ impl Unit {
         uid: u32,
         gid: u32,
         enabled: bool,
-        liveness_probe: Option<ProcessProbeRef>,
+        liveness_probe: Option<LivenessProbeRef>,
     ) -> UnitRef {
         Arc::new(Mutex::new(Unit::new(
             name,
@@ -112,7 +112,7 @@ impl Unit {
         return self.enabled;
     }
 
-    pub fn get_liveness_probe(&self) -> Option<ProcessProbeRef> {
+    pub fn get_liveness_probe(&self) -> Option<LivenessProbeRef> {
         return self.liveness_probe.clone();
     }
 

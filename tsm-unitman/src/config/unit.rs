@@ -44,7 +44,7 @@ impl Unit {
         return self.enabled.clone().unwrap_or(true);
     }
 
-    pub fn get_liveness_probe(&self) -> Option<unit::ProcessProbeRef> {
+    pub fn get_liveness_probe(&self) -> Option<unit::LivenessProbeRef> {
         return match &self.liveness_probe {
             Some(liveness_probe) => Some(liveness_probe.build_ref()),
             None => None,
