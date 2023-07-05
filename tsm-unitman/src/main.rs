@@ -1,6 +1,6 @@
 use std::process::exit;
 use argparse::{ArgumentParser, Store};
-use log::{error, debug};
+use log::{error, debug, warn};
 
 mod config;
 mod unit;
@@ -65,21 +65,6 @@ fn init_unit_manager_or_exit(configuration: &config::Configuration) -> unit::Uni
         }
     }
 
-    let manager_clone = manager.clone();
-    ctrlc::set_handler(move || {
-        debug!("Received Ctrl-C, stopping...");
-
-        match manager_clone.lock() {
-            Ok(mut manager) => {
-                manager.request_stop();
-            },
-            Err(e) => {
-                error!("Error acquiring lock: {}", e);
-                exit(20);
-            }
-        }
-    }).expect("Error setting Ctrl-C handler");
-
     return manager;
 }
 
@@ -102,7 +87,10 @@ fn main() {
 
     // start unit manager
     match manager.lock() {
-        Ok(mut manager) => manager.run(),
+        Ok(mut manager) => {
+            let handle = manager.run();
+            handle.join().expect("Error joining unit manager thread");
+        },
         Err(e) => {
             error!("Error acquiring lock: {}", e);
             exit(20);

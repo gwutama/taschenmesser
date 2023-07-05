@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::thread::JoinHandle;
 use std::time::Duration;
 use log::{debug, error, warn};
 
@@ -158,7 +159,12 @@ impl UnitManager {
         };
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&self) -> JoinHandle<()> {
+        let mut self_clone = self.clone();
+        return thread::spawn(move || self_clone.run_loop());
+    }
+
+    pub fn run_loop(&mut self) {
         debug!("Starting units");
         self.start_all();
 
