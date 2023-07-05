@@ -1,10 +1,9 @@
 use std::process::{Child, Command, Stdio};
 use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
-use sysinfo::{Pid, PidExt, ProcessRefreshKind, System, SystemExt};
 use log::{debug, warn, trace};
 
-use crate::unit::{RestartPolicy, LivenessProbeRef, ProbeState};
+use crate::unit::{RestartPolicy, ProcessProbe, ProcessProbeRef, LivenessProbeRef, ProbeState};
 
 
 pub type UnitRef = Arc<Mutex<Unit>>;
@@ -21,9 +20,8 @@ pub struct Unit {
     gid: u32,
     enabled: bool,
     liveness_probe: Option<LivenessProbeRef>,
+    process_probe: Option<ProcessProbeRef>,
     child: Option<Box<Child>>,
-    system_info: System,
-    probe_state: ProbeState,
 }
 
 
@@ -48,9 +46,8 @@ impl Unit {
             gid,
             enabled,
             liveness_probe,
+            process_probe: None,
             child: None,
-            system_info: System::new(),
-            probe_state: ProbeState::Undefined,
         }
     }
 
@@ -77,111 +74,97 @@ impl Unit {
     }
 
     pub fn get_name(&self) -> String {
-        return self.name.clone();
+        self.name.clone()
     }
 
     pub fn get_executable(&self) -> String {
-        return self.executable.clone();
+        self.executable.clone()
     }
 
     pub fn get_arguments(&self) -> Vec<String> {
-        return self.arguments.clone();
+        self.arguments.clone()
     }
 
     pub fn add_dependency(&mut self, unit: UnitRef) {
         self.dependencies.push(unit);
     }
 
-    pub fn get_dependencies(&self) -> &Vec<UnitRef> {
-        return &self.dependencies;
+    pub fn get_dependencies(&self) -> Vec<UnitRef> {
+        self.dependencies.clone()
     }
 
     pub fn get_restart_policy(&self) -> RestartPolicy {
-        return self.restart_policy.clone();
+        self.restart_policy.clone()
     }
 
     pub fn get_uid(&self) -> u32 {
-        return self.uid;
+        self.uid
     }
 
     pub fn get_gid(&self) -> u32 {
-        return self.gid;
+        self.gid
     }
 
     pub fn is_enabled(&self) -> bool {
-        return self.enabled;
+        self.enabled
     }
 
-    pub fn get_liveness_probe(&self) -> Option<LivenessProbeRef> {
-        return self.liveness_probe.clone();
-    }
-
-    pub fn get_probe_state(&self) -> ProbeState {
-        return self.probe_state.clone();
-    }
-
-    /// A unit is running if its pid exists
-    pub fn test_running(&mut self) -> bool {
+    pub fn get_pid(&self) -> Option<u32> {
         return match self.child {
-            Some(ref _child) => {
-                match self.get_pid() {
-                    Some(_pid) => {
-                        true
+            Some(ref child) => Some(child.as_ref().id()),
+            None => None,
+        };
+    }
+
+    pub fn get_process_probe_state(&self) -> ProbeState {
+        return match self.process_probe {
+            Some(ref process_probe) => {
+                match process_probe.lock() {
+                    Ok(process_probe) => {
+                        let probe_state = process_probe.get_state();
+                        trace!("Unit {} process probe state: {:?}", self.name, probe_state);
+                        probe_state
                     }
-                    None => {
-                        self.cleanup_process_handle();
-                        self.cleanup_liveness_probe_prevent_unit_restart();
-                        false
+                    Err(error) => {
+                        warn!("Unit {} failed to get process probe state: {}", self.name, error);
+                        ProbeState::Undefined
                     }
                 }
             }
             None => {
-                false
+                trace!("Unit {} does not have a process probe yet", self.name);
+                ProbeState::Undefined
             }
-        }
+        };
     }
 
-    /// Returns the Process ID (PID) of a child process, if it exists
-    /// We also check whether the process is still alive.
-    pub fn get_pid(&mut self) -> Option<u32> {
-        return match self.child {
-            Some(ref mut child) => {
-                // Check whether we have exit code, which means that the process was exited
-                match child.try_wait() {
-                    Ok(Some(exit_status)) => {
-                        // Process is not running anymore
-                        trace!("Unit {} exited with code {}", self.name, exit_status);
-                        None
+    pub fn get_liveness_probe_state(&self) -> ProbeState {
+        return match self.liveness_probe {
+            Some(ref liveness_probe) => {
+                match liveness_probe.lock() {
+                    Ok(liveness_probe) => {
+                        liveness_probe.get_state()
                     }
-                    Ok(None) | Err(_) => {
-                        // Case child does not have an exit code or asking for exit code failed
-                        // Process is maybe still running. Check whether pid still exists.
-                        let pid = Pid::from_u32(child.id());
-                        let refresh_kind = ProcessRefreshKind::new();
-                        let process_exists = self.system_info.refresh_process_specifics(pid, refresh_kind);
-
-                        if process_exists {
-                            trace!("Unit {} is running with pid {}", self.name, pid);
-                            Some(child.id())
-                        } else {
-                            trace!("Unit {} is NOT running, pid {} does not exist anymore", self.name, pid);
-                            None
-                        }
+                    Err(error) => {
+                        warn!("Unit {} failed to get liveness probe state: {}", self.name, error);
+                        ProbeState::Undefined
                     }
                 }
             }
             None => {
-                None
+                ProbeState::Undefined
             }
-        }
+        };
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.get_process_probe_state() == ProbeState::Alive
     }
 
     /// Starts the child process
     pub fn start(&mut self) -> Result<bool, String> {
-        let (can_start, reason) = self.can_start();
-
-        if !can_start {
-            return Err(format!("Cannot start unit {}: {}", self.name, reason));
+        if !self.can_start() {
+            return Err(format!("Cannot start unit {}", self.name));
         }
 
         let child = Command::new(&self.executable)
@@ -196,22 +179,20 @@ impl Unit {
             Ok(child) => {
                 debug!("Unit {} was started", self.name);
                 self.child = Some(Box::new(child));
+                self.start_probes();
+                Ok(true)
             }
             Err(error) => {
                 self.child = None;
-                return Err(format!("Unit {} failed to start: {}", self.name, error));
+                Err(format!("Unit {} failed to start: {}", self.name, error))
             }
         }
-
-        return Ok(true);
     }
 
     /// Stops the child process
     pub fn stop(&mut self) -> Result<bool, String> {
-        let (can_stop, reason) = self.can_stop();
-
-        if !can_stop {
-            return Err(format!("Cannot stop unit {}: {}", self.name, reason));
+        if !self.can_stop() {
+            return Err(format!("Cannot stop unit {}", self.name));
         }
 
         match self.child {
@@ -219,8 +200,8 @@ impl Unit {
                 match child.kill() {
                     Ok(_) => {
                         debug!("Unit {} was stopped", self.name);
+                        self.stop_probes();
                         self.cleanup_process_handle();
-                        self.cleanup_liveness_probe_prevent_unit_restart();
                         Ok(true)
                     }
                     Err(error) => {
@@ -229,70 +210,138 @@ impl Unit {
                 }
             }
             None => {
-                Err(format!("Cannot stop unit {} because it is NOT running", self.name))
+                warn!("Cannot stop unit {} because it is NOT running", self.name);
+                Ok(false)
+            }
+        }
+    }
+
+    pub fn restart(&mut self) -> Result<bool, String> {
+        debug!("Restarting unit {}", self.name);
+        match self.stop() {
+            Ok(_) => {
+                match self.start() {
+                    Ok(_) => {
+                        Ok(true)
+                    }
+                    Err(error) => {
+                        Err(error)
+                    }
+                }
+            }
+            Err(error) => {
+                Err(error)
             }
         }
     }
 
     /// A unit is allowed to start if it is enabled and all dependencies are running
-    fn can_start(&mut self) -> (bool, String) {
+    fn can_start(&mut self) -> bool {
         if !self.enabled {
-            return (false, String::from("Unit is not enabled"));
+            warn!("Unit {} is not enabled", self.name);
+            return false;
         }
 
-        // ignore if unit is running, i.e. child is not None
-        if self.test_running() {
-            return (false, String::from("Unit is already running"));
+        // ignore if unit is running
+        if self.is_running() {
+            warn!("Unit {} is already running", self.name);
+            return false;
         }
 
         for dependency in &self.dependencies {
-            let mut unit = dependency.lock().unwrap();
-            if !unit.test_running() {
-                return (false, format!("Unit depends on {} but it is not running", unit.name));
+            match dependency.lock() {
+                Ok(unit) => {
+                    if !unit.is_running() {
+                        // dependency is not running, so we cannot start
+                        warn!("Unit {} cannot start because dependency {} is not running", self.name, unit.name);
+                        return false;
+                    }
+                }
+                Err(error) => {
+                    warn!("Unit {} failed to lock dependency: {}", self.name, error);
+                    return false;
+                }
             }
         }
 
-        return (true, String::from(""));
+        return true;
     }
 
-    /// A unit is allowed to start if it is enabled and all dependencies are stopped
-    fn can_stop(&mut self) -> (bool, String) {
-        if !self.enabled {
-            return (false, String::from("Unit is not enabled"));
+    /// A unit is allowed to stop if it is running
+    fn can_stop(&self) -> bool {
+        if !self.is_enabled() {
+            warn!("Unit {} is not enabled", self.name);
+            return false;
         }
 
-        // ignore if unit is stopped, i.e. child is None
-        if !self.test_running() {
-            return (false, String::from("Unit is already stopped"));
+        // ignore if unit is stopped
+        if !self.is_running() {
+            warn!("Unit {} is already stopped", self.name);
+            return false;
         }
 
-        for dependency in &self.dependencies {
-            let mut unit = dependency.lock().unwrap();
-            if unit.test_running() {
-                return (false, format!("Unit depends on {} but it is still running", unit.name));
+        return true;
+    }
+
+    fn start_probes(&mut self) {
+        // Start process probe
+        match self.get_pid() {
+            Some(pid) => {
+                let process_probe = ProcessProbe::new(
+                    self.get_name(),
+                    pid,
+                    5,
+                );
+
+                process_probe.run();
+                self.process_probe = Some(Arc::new(Mutex::new(process_probe)));
+            }
+            None => {
+                warn!("Cannot start process probe for unit {}", self.name);
             }
         }
 
-        return (true, String::from(""));
-    }
-
-    pub fn liveness_probe(&mut self) {
+        // Start liveness probe
         match self.liveness_probe {
-            Some(ref mut probe) => {
-                trace!("Unit {} probing", self.name);
-
-                let probe_success_result = probe.lock().unwrap().probe();
-                match probe_success_result {
-                    Ok(probe_success) => { // true if probe succeeded, false if not time to probe yet
-                        if probe_success {
-                            debug!("Unit {} probe succeeded. Setting probe state to Alive.", self.name);
-                            self.probe_state = ProbeState::Alive;
-                        }
+            Some(ref liveness_probe) => {
+                match liveness_probe.lock() {
+                    Ok(liveness_probe) => {
+                        liveness_probe.run();
                     }
                     Err(error) => {
-                        warn!("Unit {} probe failed. Process does not exist anymore. Setting probe state to Dead: {}", self.name, error);
-                        self.cleanup_process_handle();
-                        self.cleanup_liveness_probe_prevent_unit_restart(); // sets probe_state to Dead
+                        warn!("Unit {} failed to start liveness probe: {}", self.name, error);
+                    }
+                }
+            }
+            None => {}
+        }
+    }
+
+    fn stop_probes(&mut self) {
+        // Stop process probe
+        match self.process_probe {
+            Some(ref process_probe) => {
+                match process_probe.lock() {
+                    Ok(mut process_probe) => {
+                        process_probe.request_stop();
+                    }
+                    Err(error) => {
+                        warn!("Unit {} failed to stop process probe: {}", self.name, error);
+                    }
+                }
+            }
+            None => {}
+        }
+
+        // Stop liveness probe
+        match self.liveness_probe {
+            Some(ref liveness_probe) => {
+                match liveness_probe.lock() {
+                    Ok(mut liveness_probe) => {
+                        liveness_probe.request_stop();
+                    }
+                    Err(error) => {
+                        warn!("Unit {} failed to stop liveness probe: {}", self.name, error);
                     }
                 }
             }
@@ -318,19 +367,6 @@ impl Unit {
                 }
 
                 self.child = None;
-            }
-            None => {}
-        }
-    }
-
-    fn cleanup_liveness_probe_prevent_unit_restart(&mut self) {
-        match self.liveness_probe {
-            Some(ref mut _probe) => {
-                if self.restart_policy == RestartPolicy::Never {
-                    debug!("Restart policy of unit {} was configured to never. Stopping probe and setting probe state to Dead.", self.name);
-                    self.liveness_probe = None;
-                    self.probe_state = ProbeState::Dead;
-                }
             }
             None => {}
         }
@@ -415,27 +451,27 @@ mod tests {
     fn is_running_returns_correct_values_at_init() {
         let mut unit = build_unit();
 
-        assert_eq!(unit.test_running(), false);
+        assert_eq!(unit.is_running(), false);
     }
 
     #[test]
     fn is_running_returns_correct_values_after_start() {
         let mut unit = build_unit();
 
-        assert_eq!(unit.test_running(), false);
+        assert_eq!(unit.is_running(), false);
         unit.start().unwrap();
-        assert_eq!(unit.test_running(), true);
+        assert_eq!(unit.is_running(), true);
     }
 
     #[test]
     fn is_running_returns_correct_values_after_stop() {
         let mut unit = build_unit();
 
-        assert_eq!(unit.test_running(), false);
+        assert_eq!(unit.is_running(), false);
         unit.start().unwrap();
-        assert_eq!(unit.test_running(), true);
+        assert_eq!(unit.is_running(), true);
         unit.stop().unwrap();
-        assert_eq!(unit.test_running(), false);
+        assert_eq!(unit.is_running(), false);
     }
 
     #[test]
@@ -458,16 +494,16 @@ mod tests {
         let (unit1, unit2) = build_unitrefs();
 
         unit1.lock().unwrap().start().unwrap();
-        assert_eq!(unit1.lock().unwrap().test_running(), true);
-        assert_eq!(unit2.lock().unwrap().can_start().0, true);
+        assert_eq!(unit1.lock().unwrap().is_running(), true);
+        assert_eq!(unit2.lock().unwrap().can_start(), true);
     }
 
     #[test]
     fn cannot_start_when_dependent_unit_is_not_running() {
         let (unit1, unit2) = build_unitrefs();
 
-        assert_eq!(unit1.lock().unwrap().test_running(), false);
-        assert_eq!(unit2.lock().unwrap().can_start().0, false);
+        assert_eq!(unit1.lock().unwrap().is_running(), false);
+        assert_eq!(unit2.lock().unwrap().can_start(), false);
     }
 
     #[test]
@@ -478,8 +514,8 @@ mod tests {
         unit2.lock().unwrap().start().unwrap();
         unit1.lock().unwrap().stop().unwrap();
 
-        assert_eq!(unit1.lock().unwrap().test_running(), false);
-        assert_eq!(unit2.lock().unwrap().can_stop().0, true);
+        assert_eq!(unit1.lock().unwrap().is_running(), false);
+        assert_eq!(unit2.lock().unwrap().can_stop(), true);
     }
 
     #[test]
@@ -487,7 +523,7 @@ mod tests {
         let (unit1, unit2) = build_unitrefs();
 
         unit1.lock().unwrap().start().unwrap();
-        assert_eq!(unit1.lock().unwrap().test_running(), true);
-        assert_eq!(unit2.lock().unwrap().can_stop().0, false);
+        assert_eq!(unit1.lock().unwrap().is_running(), true);
+        assert_eq!(unit2.lock().unwrap().can_stop(), false);
     }
 }

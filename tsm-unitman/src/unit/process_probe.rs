@@ -3,7 +3,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use sysinfo::{Pid, PidExt, ProcessRefreshKind, System, SystemExt};
-use log::{debug, warn, trace, error};
+use log::{debug, warn, error};
 
 use crate::unit::ProbeState;
 
@@ -11,58 +11,69 @@ use crate::unit::ProbeState;
 pub type ProcessProbeRef = Arc<Mutex<ProcessProbe>>;
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ProcessProbe {
-    pid: Option<i32>,
+    name: String,
+    pid: u32,
     interval_s: i32,
     system_info: Arc<Mutex<System>>,
-    probe_state: ProbeState,
+    state: Arc<Mutex<ProbeState>>,
     stop_requested: Arc<Mutex<bool>>,
 }
 
 
 impl ProcessProbe {
     pub fn new(
-        pid: Option<i32>,
+        name: String,
+        pid: u32,
         interval_s: i32,
-        system_info: Arc<Mutex<System>>,
     ) -> ProcessProbe {
         return ProcessProbe {
+            name,
             pid,
             interval_s,
-            system_info,
-            probe_state: ProbeState::Undefined,
+            system_info: Arc::new(Mutex::new(System::new())),
+            state: Arc::new(Mutex::new(ProbeState::Undefined)),
             stop_requested: Arc::new(Mutex::new(false)),
         };
     }
 
-    pub fn new_ref(
-        pid: Option<i32>,
-        interval_s: i32,
-        system_info: Arc<Mutex<System>>,
-    ) -> ProcessProbeRef {
-        return Arc::new(Mutex::new(ProcessProbe::new(
-            pid,
-            interval_s,
-            system_info,
-        )));
+    pub fn get_state(&self) -> ProbeState {
+        match self.state.lock() {
+            Ok(state) => state.clone(),
+            Err(e) => {
+                error!("Process probe for unit {} failed to lock state: {}", self.name, e);
+                ProbeState::Undefined
+            }
+        }
+    }
+
+    fn set_state(&mut self, new_state: ProbeState) {
+        match self.state.lock() {
+            Ok(mut state) => *state = new_state.clone(),
+            Err(e) => {
+                error!("Process probe for unit {} failed to lock state: {}", self.name, e)
+            },
+        };
     }
 
     fn stop_requested(&self) -> bool {
         return match self.stop_requested.lock() {
-            Ok(should_stop) => *should_stop,
+            Ok(stop_requested) => *stop_requested,
             Err(e) => {
-                error!("Failed to lock stop_requested: {}", e);
+                error!("Process probe for unit {} failed to lock stop_requested: {}", self.name, e);
                 false
             }
         };
     }
 
-    /// Set should_stop flag to true
+    /// Set stop_requested flag to true
     pub fn request_stop(&mut self) {
         match self.stop_requested.lock() {
-            Ok(mut should_stop) => *should_stop = true,
-            Err(e) => error!("Failed to lock stop_requested: {}", e),
+            Ok(mut stop_requested) => *stop_requested = true,
+            Err(e) => {
+                error!("Process probe for unit {} failed to lock stop_requested: {}", self.name, e)
+            },
         };
     }
 
@@ -76,7 +87,7 @@ impl ProcessProbe {
     fn run_loop(&mut self) {
         loop {
             if self.stop_requested() {
-                debug!("Stop requested");
+                debug!("Process probe for unit {} stop requested", self.name);
                 break;
             }
 
@@ -90,40 +101,25 @@ impl ProcessProbe {
         }
     }
 
-    fn probe(&mut self, pid: Option<i32>) {
-        match pid {
-            Some(pid_val) => {
-                if self.pid_exists(pid_val) {
-                    debug!("Pid {} exists", pid_val);
-                    self.probe_state = ProbeState::Alive;
-                } else {
-                    warn!("Pid {} does not exist", pid_val);
-                    self.probe_state = ProbeState::Dead;
-                }
-            }
-            None => {
-                self.probe_state = ProbeState::Undefined
-            },
+    fn probe(&mut self, pid: u32) {
+        if self.pid_exists(pid) {
+            debug!("Process probe for unit {} (pid={}) exists. Setting probe state to Alive.", self.name, pid);
+            self.set_state(ProbeState::Alive);
+        } else {
+            warn!("Process probe for unit {} (pid={}) does not exist. Setting probe state to Dead.", self.name, pid);
+            self.set_state(ProbeState::Dead);
         }
     }
 
-    fn pid_exists(&mut self, pid: i32) -> bool {
+    fn pid_exists(&self, pid: u32) -> bool {
         return match self.system_info.lock() {
             Ok(mut system_info) => {
-                let sysinfo_pid = Pid::from_u32(pid as u32);
+                let sysinfo_pid = Pid::from_u32(pid);
                 let refresh = ProcessRefreshKind::new();
-                let process_exists = system_info.refresh_process_specifics(sysinfo_pid, refresh);
-
-                if process_exists {
-                    trace!("Pid {} exists", pid);
-                    true
-                } else {
-                    trace!("Pid {} does not exist", pid);
-                    false
-                }
+                system_info.refresh_process_specifics(sysinfo_pid, refresh)
             },
             Err(e) => {
-                error!("Failed to lock system_info: {}", e);
+                error!("Process probe for unit {} failed to lock system_info: {}", self.name, e);
                 false
             }
         }

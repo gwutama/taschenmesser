@@ -1,6 +1,6 @@
 use std::process::exit;
 use argparse::{ArgumentParser, Store};
-use log::error;
+use log::{error, debug};
 
 mod config;
 mod unit;
@@ -49,8 +49,8 @@ fn init_logger(configuration: &config::Configuration) {
 }
 
 
-fn init_unit_manager_or_exit(configuration: &config::Configuration) -> unit::ManagerRef {
-    let manager = unit::Manager::new_ref();
+fn init_unit_manager_or_exit(configuration: &config::Configuration) -> unit::UnitManagerRef {
+    let manager = unit::UnitManager::new_ref();
     let units = configuration.build_units();
 
     match manager.lock() {
@@ -67,6 +67,8 @@ fn init_unit_manager_or_exit(configuration: &config::Configuration) -> unit::Man
 
     let manager_clone = manager.clone();
     ctrlc::set_handler(move || {
+        debug!("Received Ctrl-C, stopping...");
+
         match manager_clone.lock() {
             Ok(mut manager) => {
                 manager.request_stop();
@@ -84,12 +86,13 @@ fn init_unit_manager_or_exit(configuration: &config::Configuration) -> unit::Man
 
 fn main() {
     let params = parse_args_or_exit();
+
+    // init stuffs
     let configuration = init_config_or_exit(params.config_file);
-
     init_logger(&configuration);
-
     let manager = init_unit_manager_or_exit(&configuration);
 
+    // start rpc server
     if configuration.get_rpc_server().is_enabled() {
         rpc_server::RpcServer::new(
             manager.clone(),
@@ -97,5 +100,12 @@ fn main() {
         ).run_threaded();
     }
 
-    unit::Runner::run(manager.clone());
+    // start unit manager
+    match manager.lock() {
+        Ok(mut manager) => manager.run(),
+        Err(e) => {
+            error!("Error acquiring lock: {}", e);
+            exit(20);
+        }
+    };
 }

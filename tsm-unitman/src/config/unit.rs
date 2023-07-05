@@ -45,8 +45,9 @@ impl Unit {
     }
 
     pub fn get_liveness_probe(&self) -> Option<unit::LivenessProbeRef> {
+        let name = self.get_name();
         return match &self.liveness_probe {
-            Some(liveness_probe) => Some(liveness_probe.build_ref()),
+            Some(liveness_probe) => Some(liveness_probe.build_ref(name)),
             None => None,
         }
     }

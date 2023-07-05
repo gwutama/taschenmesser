@@ -1,5 +1,5 @@
 [application]
-log_level = "debug"                     # Optional. Defaults to "info". Possible values: "debug", "info", "warn", "error", "trace".
+log_level = "trace"                     # Optional. Defaults to "info". Possible values: "debug", "info", "warn", "error", "trace".
 
 [rpc_server]
 enabled = true                                      # Optional. Defaults to false.

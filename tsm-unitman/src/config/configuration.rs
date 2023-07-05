@@ -199,7 +199,7 @@ mod tests {
         let file = String::from("resources/tsm-unitman.toml");
         let configuration = Configuration::from_file(file).unwrap();
 
-        assert_eq!(configuration.application.get_log_level(), LogLevel::Debug);
+        assert_eq!(configuration.application.get_log_level(), LogLevel::Trace);
         assert_eq!(configuration.units.len(), 2);
     }
 
