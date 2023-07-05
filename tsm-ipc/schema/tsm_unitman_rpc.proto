@@ -31,8 +31,9 @@ message Unit {
   int32 uid = 5;
   int32 gid = 6;
   bool enabled = 7;
-  ProbeState probe_state = 8;
-  int32 pid = 9;
+  ProbeState process_probe_state = 8;
+  ProbeState liveness_probe_state = 9;
+  int32 pid = 10;
 
   enum RestartPolicy {
     Always = 0;

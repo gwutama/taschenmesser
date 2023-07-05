@@ -179,7 +179,8 @@ impl ResponseHandler {
                 proto_unit.uid = unit.get_uid() as i32;
                 proto_unit.gid = unit.get_gid() as i32;
                 proto_unit.enabled = unit.is_enabled();
-                proto_unit.probe_state = EnumOrUnknown::from_i32(unit.get_liveness_probe_state().clone() as i32);
+                proto_unit.process_probe_state = EnumOrUnknown::from_i32(unit.get_process_probe_state().clone() as i32);
+                proto_unit.liveness_probe_state = EnumOrUnknown::from_i32(unit.get_liveness_probe_state().clone() as i32);
 
                 match unit.get_pid() {
                     Some(pid) => proto_unit.pid = pid as i32,

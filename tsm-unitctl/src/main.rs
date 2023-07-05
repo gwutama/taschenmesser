@@ -44,7 +44,7 @@ fn main() {
 
 fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
     let mut builder = Builder::new();
-    builder.set_header(vec!["UNIT NAME", "IS ENABLED", "RESTART POLICY", "RUN STATE", "PROBE STATE", "COMMAND"]);
+    builder.set_header(vec!["UNIT NAME", "IS ENABLED", "RESTART POLICY", "RUN STATE", "PROCESS STATE", "LIVENESS STATE", "COMMAND"]);
 
     for unit in units {
         let enabled = match unit.enabled {
@@ -60,7 +60,7 @@ fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
             None => String::from("Unknown"),
         };
 
-        let probe_state = match tsm_unitman_rpc::unit::ProbeState::from_i32(unit.probe_state.value()) {
+        let process_probe_state = match tsm_unitman_rpc::unit::ProbeState::from_i32(unit.process_probe_state.value()) {
             Some(state) => match state {
                 tsm_unitman_rpc::unit::ProbeState::Undefined => String::from("Undefined"),
                 tsm_unitman_rpc::unit::ProbeState::Alive => String::from("Alive"),
@@ -69,6 +69,16 @@ fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
             None => String::from("Unknown"),
         };
 
+        let liveness_probe_state = match tsm_unitman_rpc::unit::ProbeState::from_i32(unit.liveness_probe_state.value()) {
+            Some(state) => match state {
+                tsm_unitman_rpc::unit::ProbeState::Undefined => String::from("Undefined"),
+                tsm_unitman_rpc::unit::ProbeState::Alive => String::from("Alive"),
+                tsm_unitman_rpc::unit::ProbeState::Dead => String::from("Dead"),
+            },
+            None => String::from("Unknown"),
+        };
+
+
         let command = format!("{} {}", unit.executable, unit.arguments.join(" "));
 
         let run_state: String = match unit.pid {
@@ -76,7 +86,7 @@ fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
             _ => String::from("Stopped"),
         };
 
-        builder.push_record([unit.name, enabled, restart_policy, run_state, probe_state, command]);
+        builder.push_record([unit.name, enabled, restart_policy, run_state, process_probe_state, liveness_probe_state, command]);
     }
 
     let mut table = builder.build();
