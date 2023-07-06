@@ -47,7 +47,7 @@ impl UnitManager {
 
     /// Iterate over all units and try to start them
     /// Note that we need to call this function several times until all dependencies are started
-    fn start_all(&mut self) {
+    fn start_units(&mut self) {
         self.reset_stop_request();
 
         // TODO: Max retries
@@ -68,27 +68,35 @@ impl UnitManager {
 
             thread::sleep(Duration::from_secs(1));
         }
+
+        // start probes
+        // Probes are not started inside the loop above because if a unit is stopped
+        // inside the loop, it will be started again by the loop
+        for unit in &self.units {
+            match unit.try_lock() {
+                Ok(mut unit) => unit.start_probes(),
+                Err(e) => error!("Error acquiring lock while starting unit probes: {}", e),
+            }
+        }
     }
 
     /// Iterate over all units and try to stop them
-    /// Note that we need to call this function several times until all dependencies are stopped
-    fn stop_all(&mut self) {
-        // TODO: Max retries
-        while !self.all_units_stopped() {
-            for unit in &self.units {
-                match unit.try_lock() {
-                    Ok(mut unit) => {
-                        match unit.stop() {
-                            Ok(_) => debug!("Stopped unit {}", unit.get_name()),
-                            Err(e) => warn!("Error stopping unit {}: {}", unit.get_name(), e),
-                        }
+    /// Units will be stopped regardless of their dependencies
+    fn stop_units(&mut self) {
+        for unit in &self.units {
+            match unit.try_lock() {
+                Ok(mut unit) => {
+                    // stopping unit will automatically stop its probes and cleanup its resources
+                    match unit.stop() {
+                        Ok(_) => debug!("Stopped unit {}", unit.get_name()),
+                        Err(e) => warn!("Error stopping unit {}: {}", unit.get_name(), e),
                     }
-                    Err(e) => error!("Error acquiring lock while stopping unit: {}", e),
                 }
+                Err(e) => error!("Error acquiring lock while stopping unit: {}", e),
             }
-
-            thread::sleep(Duration::from_secs(1));
         }
+
+        thread::sleep(Duration::from_secs(1));
     }
 
     /// Returns true if all units are running
@@ -96,7 +104,7 @@ impl UnitManager {
     fn all_units_running(&self) -> bool {
         for unit in &self.units {
             match unit.try_lock() {
-                Ok(unit) => {
+                Ok(mut unit) => {
                     if !unit.is_running() {
                         return false;
                     }
@@ -116,7 +124,7 @@ impl UnitManager {
     fn all_units_stopped(&self) -> bool {
         for unit in &self.units {
             match unit.try_lock() {
-                Ok(unit) => {
+                Ok(mut unit) => {
                     if unit.is_running() {
                         return false;
                     }
@@ -166,7 +174,7 @@ impl UnitManager {
 
     pub fn run_loop(&mut self) {
         debug!("Starting units");
-        self.start_all();
+        self.start_units();
 
         debug!("Monitoring units");
         loop {
@@ -180,7 +188,7 @@ impl UnitManager {
         }
 
         debug!("Shutting down units");
-        self.stop_all();
+        self.stop_units();
         self.reset_stop_request();
     }
 
@@ -188,7 +196,13 @@ impl UnitManager {
         for unit in &self.units {
             match unit.try_lock() {
                 Ok(mut unit) => {
-                    if !unit.is_running() && unit.get_restart_policy() == RestartPolicy::Always {
+                    let is_running = unit.is_running();
+
+                    if !is_running {
+                        unit.stop(); // force cleanup resources
+                    }
+
+                    if !is_running && unit.get_restart_policy() == RestartPolicy::Always {
                         debug!("Unit {} is not running, restarting because restart policy was set to Always.", unit.get_name());
                         match unit.restart() {
                             Ok(_) => debug!("Unit {} restarted", unit.get_name()),
@@ -290,7 +304,7 @@ mod tests {
         manager.add_unit(unit2.clone());
         assert_eq!(manager.units.len(), 2);
 
-        manager.start_all();
+        manager.start_units();
         assert_eq!(unit1.lock().unwrap().is_running(), true);
         assert_eq!(unit2.lock().unwrap().is_running(), true);
     }
@@ -305,7 +319,7 @@ mod tests {
         assert_eq!(manager.units.len(), 2);
 
         assert_eq!(manager.all_units_running(), false);
-        manager.start_all();
+        manager.start_units();
         assert_eq!(manager.all_units_running(), true);
     }
 
@@ -318,11 +332,11 @@ mod tests {
         manager.add_unit(unit2.clone());
         assert_eq!(manager.units.len(), 2);
 
-        manager.start_all();
+        manager.start_units();
         assert_eq!(unit1.lock().unwrap().is_running(), true);
         assert_eq!(unit2.lock().unwrap().is_running(), true);
 
-        manager.stop_all();
+        manager.stop_units();
         assert_eq!(unit1.lock().unwrap().is_running(), false);
         assert_eq!(unit2.lock().unwrap().is_running(), false);
     }
@@ -336,10 +350,10 @@ mod tests {
         manager.add_unit(unit2.clone());
         assert_eq!(manager.units.len(), 2);
 
-        manager.start_all();
+        manager.start_units();
         assert_eq!(manager.all_units_running(), true);
 
-        manager.stop_all();
+        manager.stop_units();
         assert_eq!(manager.all_units_stopped(), true);
     }
 }

@@ -30,8 +30,8 @@ impl ProcessProbe {
         return self.interval_s.unwrap_or(60);
     }
 
-    pub fn build_ref(&self, name: String) -> unit::LivenessProbeRef {
-        return unit::LivenessProbe::new_ref(
+    pub fn build(&self, name: String) -> unit::LivenessProbe {
+        return unit::LivenessProbe::new(
             name,
             self.get_executable(),
             self.get_arguments(),

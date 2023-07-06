@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use serde::Deserialize;
 use users::{get_current_gid, get_current_uid, get_group_by_name, get_user_by_name};
 
@@ -44,16 +45,16 @@ impl Unit {
         return self.enabled.clone().unwrap_or(true);
     }
 
-    pub fn get_liveness_probe(&self) -> Option<unit::LivenessProbeRef> {
+    pub fn get_liveness_probe(&self) -> Option<unit::LivenessProbe> {
         let name = self.get_name();
         return match &self.liveness_probe {
-            Some(liveness_probe) => Some(liveness_probe.build_ref(name)),
+            Some(liveness_probe) => Some(liveness_probe.build(name)),
             None => None,
         }
     }
 
     pub fn build_ref(&self) -> unit::UnitRef {
-        return unit::Unit::new_ref(
+        let mut unit = unit::Unit::new(
             self.get_name(),
             self.get_executable(),
             self.get_arguments(),
@@ -61,8 +62,16 @@ impl Unit {
             self.get_uid(),
             self.get_gid(),
             self.is_enabled(),
-            self.get_liveness_probe(),
         );
+
+        match self.get_liveness_probe() {
+            Some(liveness_probe) => {
+                unit.set_liveness_probe(liveness_probe);
+            },
+            None => {},
+        }
+
+        Arc::new(Mutex::new(unit))
     }
 
     /// If user is valid, return its uid

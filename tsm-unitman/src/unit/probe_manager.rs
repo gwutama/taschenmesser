@@ -3,6 +3,7 @@ use log::{debug, warn, trace};
 use crate::unit::{ProbeState, LivenessProbe, ProcessProbe};
 
 
+#[derive(Debug)]
 pub struct ProbeManager {
     unit_name: String,
     liveness_probe: Option<LivenessProbe>,
