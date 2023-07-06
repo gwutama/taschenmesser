@@ -15,3 +15,6 @@ pub use liveness_probe::{LivenessProbe, LivenessProbeRef};
 
 mod probe_state;
 pub use probe_state::ProbeState;
+
+mod process;
+pub use process::Process;
