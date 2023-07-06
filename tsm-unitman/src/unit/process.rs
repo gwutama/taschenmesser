@@ -1,7 +1,7 @@
 use std::process::{Child, Command, Stdio, ExitStatus};
 use std::os::unix::process::CommandExt;
 use std::sync::{Arc, Mutex};
-use log::{warn, trace};
+use log::{warn, debug};
 
 
 pub type ProcessRef = Arc<Mutex<Process>>;
@@ -92,7 +92,7 @@ impl Process {
                     Ok(Some(exit_code)) => {
                         // Process is not running anymore
                         self.child = None;
-                        trace!("Process {} exited with code {}", self.executable, exit_code);
+                        debug!("Process {} exited with code {}", self.executable, exit_code);
                         Some(ExitStatus::from(exit_code))
                     }
                     Ok(None) | Err(_) => None,
@@ -105,7 +105,7 @@ impl Process {
     /// Starts the child process
     pub fn start(&mut self) -> Result<bool, String> {
         if self.is_running() {
-            trace!("Cannot start process {} because it is already running", self.executable);
+            debug!("Cannot start process {} because it is already running", self.executable);
             return Ok(false);
         }
 
@@ -119,7 +119,7 @@ impl Process {
 
         match child {
             Ok(child) => {
-                trace!("Process {} was started", self.executable);
+                debug!("Process {} was started", self.executable);
                 self.child = Some(Box::new(child));
                 Ok(true)
             }
@@ -133,7 +133,7 @@ impl Process {
     /// Stops the child process
     pub fn stop(&mut self) -> Result<bool, String> {
         if !self.is_running() {
-            trace!("Cannot stop process {} because it is not running", self.executable);
+            debug!("Cannot stop process {} because it is not running", self.executable);
             return Ok(false);
         }
 
@@ -141,7 +141,7 @@ impl Process {
             Some(ref mut child) => {
                 match child.kill() {
                     Ok(_) => {
-                        trace!("Process {} was stopped", self.executable);
+                        debug!("Process {} was stopped", self.executable);
                         self.cleanup_process_handles();
                         Ok(true)
                     }
@@ -158,7 +158,7 @@ impl Process {
     }
 
     pub fn restart(&mut self) -> Result<bool, String> {
-        trace!("Restarting process {}", self.executable);
+        debug!("Restarting process {}", self.executable);
         match self.stop() {
             Ok(_) => {
                 match self.start() {

@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use log::{debug, warn, trace};
+use log::{debug, warn};
 
 use crate::unit::{RestartPolicy, ProcessProbe, ProcessProbeRef, LivenessProbe, ProbeState, Process, ProbeManager};
 
@@ -227,7 +227,7 @@ impl Unit {
 
         // ignore if unit is running
         if self.is_running() {
-            trace!("Unit {} is already running", self.name);
+            debug!("Unit {} is already running", self.name);
             return false;
         }
 
@@ -261,7 +261,7 @@ impl Unit {
 
         // ignore if unit is stopped
         if !self.is_running() {
-            trace!("Unit {} is already stopped", self.name);
+            debug!("Unit {} is already stopped", self.name);
             return false;
         }
 
@@ -274,12 +274,12 @@ impl Unit {
             return;
         }
 
-        trace!("Starting probes for unit {}", self.name);
+        debug!("Starting probes for unit {}", self.name);
         self.probe_manager.start_probes();
     }
 
     fn stop_probes(&mut self) {
-        trace!("Stopping probes for unit {}", self.name);
+        debug!("Stopping probes for unit {}", self.name);
         self.probe_manager.stop_probes();
     }
 }

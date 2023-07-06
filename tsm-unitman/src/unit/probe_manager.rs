@@ -1,4 +1,4 @@
-use log::{debug, warn, trace};
+use log::{debug, warn};
 
 use crate::unit::{ProbeState, LivenessProbe, ProcessProbe};
 
@@ -40,7 +40,7 @@ impl ProbeManager {
                 process_probe.get_state()
             },
             None => {
-                trace!("Unit {} does not have a process probe", self.unit_name);
+                debug!("Unit {} does not have a process probe", self.unit_name);
                 ProbeState::Undefined
             }
         };
@@ -56,7 +56,7 @@ impl ProbeManager {
                 liveness_probe.get_state()
             },
             None => {
-                trace!("Unit {} does not have a liveness probe", self.unit_name);
+                debug!("Unit {} does not have a liveness probe", self.unit_name);
                 ProbeState::Undefined
             }
         };
@@ -69,7 +69,7 @@ impl ProbeManager {
                 process_probe.run();
             },
             None => {
-                trace!("Cannot start process probe for unit {} because it is not set", self.unit_name);
+                debug!("Cannot start process probe for unit {} because it is not set", self.unit_name);
             }
         }
 
@@ -79,7 +79,7 @@ impl ProbeManager {
                 liveness_probe.run();
             },
             None => {
-                trace!("Cannot start liveness probe for unit {} because it is not set", self.unit_name);
+                debug!("Cannot start liveness probe for unit {} because it is not set", self.unit_name);
             }
         }
 
@@ -93,7 +93,7 @@ impl ProbeManager {
                 process_probe.request_stop();
             },
             None => {
-                trace!("Cannot stop process probe for unit {} because it is not set", self.unit_name);
+                debug!("Cannot stop process probe for unit {} because it is not set", self.unit_name);
             }
         }
 
@@ -103,7 +103,7 @@ impl ProbeManager {
                 liveness_probe.request_stop();
             },
             None => {
-                trace!("Cannot start liveness probe for unit {} because it is not set", self.unit_name);
+                debug!("Cannot start liveness probe for unit {} because it is not set", self.unit_name);
             }
         }
 
