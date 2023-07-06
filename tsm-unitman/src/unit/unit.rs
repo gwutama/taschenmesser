@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 use log::{debug, warn};
 
-use crate::unit::{RestartPolicy, ProcessProbe, ProcessProbeRef, LivenessProbe, ProbeState, Process, ProbeManager};
+use crate::unit::{RestartPolicy, ProcessProbe, LivenessProbe, ProbeState, Process, ProbeManager};
 
 
 pub type UnitRef = Arc<Mutex<Unit>>;
@@ -46,26 +46,6 @@ impl Unit {
         }
     }
 
-    pub fn new_ref(
-        name: String,
-        executable: String,
-        arguments: Vec<String>,
-        restart_policy: RestartPolicy,
-        uid: u32,
-        gid: u32,
-        enabled: bool,
-    ) -> UnitRef {
-        Arc::new(Mutex::new(Unit::new(
-            name,
-            executable,
-            arguments,
-            restart_policy,
-            uid,
-            gid,
-            enabled,
-        )))
-    }
-
     pub fn set_liveness_probe(&mut self, probe: LivenessProbe) {
         self.probe_manager.set_liveness_probe(probe);
     }
@@ -84,10 +64,6 @@ impl Unit {
 
     pub fn add_dependency(&mut self, unit: UnitRef) {
         self.dependencies.push(unit);
-    }
-
-    pub fn get_dependencies(&self) -> Vec<UnitRef> {
-        self.dependencies.clone()
     }
 
     pub fn get_restart_policy(&self) -> RestartPolicy {

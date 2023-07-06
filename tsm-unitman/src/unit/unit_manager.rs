@@ -1,10 +1,10 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use log::{debug, error, warn, info};
 
-use crate::unit::{RestartPolicy, Unit, UnitRef};
+use crate::unit::{RestartPolicy, UnitRef};
 
 
 pub type UnitManagerRef = Arc<Mutex<UnitManager>>;
@@ -91,46 +91,6 @@ impl UnitManager {
         thread::sleep(Duration::from_secs(1));
     }
 
-    /// Returns true if all units are running
-    /// Returns false if at least one unit is not running
-    fn all_units_running(&self) -> bool {
-        for unit in &self.units {
-            match unit.try_lock() {
-                Ok(mut unit) => {
-                    if !unit.is_running() {
-                        return false;
-                    }
-                }
-                Err(e) => {
-                    warn!("Error acquiring lock while checking if all units are running: {}", e);
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    /// Returns true if all units are stopped
-    /// Returns false if at least one unit is not stopped
-    fn all_units_stopped(&self) -> bool {
-        for unit in &self.units {
-            match unit.try_lock() {
-                Ok(mut unit) => {
-                    if unit.is_running() {
-                        return false;
-                    }
-                }
-                Err(e) => {
-                    warn!("Error acquiring lock while checking if all units are stopped: {}", e);
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
     fn stop_requested(&self) -> bool {
         return match self.stop_requested.try_lock() {
             Ok(stop_requested) => *stop_requested,
@@ -204,7 +164,10 @@ impl UnitManager {
 
                     if !is_running {
                         debug!("Force stopping unit {} to make sure resources are cleaned up", unit.get_name());
-                        unit.stop(); // make sure that resources are cleaned up
+                        match unit.stop() {
+                            Ok(_) => debug!("Stopped unit {}", unit.get_name()),
+                            Err(e) => warn!("Error stopping unit {}: {}", unit.get_name(), e),
+                        }
                     }
 
                     if !is_running && unit.get_restart_policy() == RestartPolicy::Always {

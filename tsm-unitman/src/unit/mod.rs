@@ -8,10 +8,10 @@ mod restart_policy;
 pub use restart_policy::RestartPolicy;
 
 mod process_probe;
-pub use process_probe::{ProcessProbe, ProcessProbeRef};
+pub use process_probe::ProcessProbe;
 
 mod liveness_probe;
-pub use liveness_probe::{LivenessProbe, LivenessProbeRef};
+pub use liveness_probe::LivenessProbe;
 
 mod probe_manager;
 pub use probe_manager::ProbeManager;

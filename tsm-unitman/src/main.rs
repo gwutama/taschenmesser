@@ -1,6 +1,6 @@
 use std::process::exit;
 use argparse::{ArgumentParser, Store};
-use log::{error, debug, warn};
+use log::{error};
 
 mod config;
 mod unit;
@@ -89,8 +89,8 @@ fn main() {
     let handle: std::thread::JoinHandle<()>;
 
     match manager.try_lock() {
-        Ok(mut manager) => {
-            handle = manager.run();
+        Ok(manager_lock) => {
+            handle = manager_lock.run();
         },
         Err(e) => {
             error!("Error acquiring lock: {}", e);

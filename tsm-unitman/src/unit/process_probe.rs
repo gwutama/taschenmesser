@@ -8,9 +8,6 @@ use log::{debug, warn, error};
 use crate::unit::ProbeState;
 
 
-pub type ProcessProbeRef = Arc<Mutex<ProcessProbe>>;
-
-
 #[derive(Clone, Debug)]
 pub struct ProcessProbe {
     name: String,

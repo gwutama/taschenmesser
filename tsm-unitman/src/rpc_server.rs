@@ -8,8 +8,6 @@ use crate::unit;
 
 
 pub struct RpcServer {
-    unit_manager: unit::UnitManagerRef,
-    bind_address: String,
     rpc_server: tsm_ipc::RpcServer,
 }
 
@@ -22,8 +20,6 @@ impl RpcServer {
         let rpc_server = tsm_ipc::RpcServer::new(bind_address.clone(), request_handler);
 
         Self {
-            unit_manager,
-            bind_address,
             rpc_server,
         }
     }
@@ -170,7 +166,7 @@ impl ResponseHandler {
     /// TODO: Move to rpc_server::Converter
     fn convert_unit_to_proto(&self, unit: &unit::UnitRef) -> Result<tsm_unitman_rpc::Unit, String> {
         match unit.try_lock() {
-            Ok(mut unit) => {
+            Ok(unit) => {
                 let mut proto_unit = tsm_unitman_rpc::Unit::new();
 
                 proto_unit.name = unit.get_name().clone();

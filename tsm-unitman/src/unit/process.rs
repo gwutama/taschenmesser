@@ -1,10 +1,6 @@
 use std::process::{Child, Command, Stdio, ExitStatus};
 use std::os::unix::process::CommandExt;
-use std::sync::{Arc, Mutex};
 use log::{warn, debug};
-
-
-pub type ProcessRef = Arc<Mutex<Process>>;
 
 
 #[derive(Debug)]
@@ -31,20 +27,6 @@ impl Process {
             gid,
             child: None,
         };
-    }
-
-    pub fn new_ref(
-        executable: String,
-        arguments: Vec<String>,
-        uid: u32,
-        gid: u32,
-    ) -> ProcessRef {
-        return Arc::new(Mutex::new(Process::new(
-            executable,
-            arguments,
-            uid,
-            gid,
-        )));
     }
 
     pub fn get_executable(&self) -> String {

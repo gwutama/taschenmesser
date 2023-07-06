@@ -5,11 +5,8 @@ use process_control::{ChildExt, Control, ExitStatus};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
-use log::{debug, warn, trace, error};
+use log::{debug, warn, error};
 use crate::unit::ProbeState;
-
-
-pub type LivenessProbeRef = Arc<Mutex<LivenessProbe>>;
 
 
 #[derive(Debug, Clone)]
@@ -45,22 +42,6 @@ impl LivenessProbe {
             stop_requested: false,
             probe_timestamp: Instant::now(),
         };
-    }
-
-    pub fn new_ref(
-        name: String,
-        executable: String,
-        arguments: Vec<String>,
-        timeout_s: i32,
-        interval_s: i32,
-    ) -> LivenessProbeRef {
-        return Arc::new(Mutex::new(LivenessProbe::new(
-            name,
-            executable,
-            arguments,
-            timeout_s,
-            interval_s,
-        )));
     }
 
     pub fn get_state(&self) -> ProbeState {
