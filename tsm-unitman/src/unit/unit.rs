@@ -15,7 +15,6 @@ pub struct Unit {
     enabled: bool,
     process: Process,
     probe_manager: ProbeManager,
-    is_manually_stopped: bool,
 }
 
 
@@ -44,7 +43,6 @@ impl Unit {
             enabled,
             process,
             probe_manager: ProbeManager::new(name.clone()),
-            is_manually_stopped: false,
         }
     }
 
@@ -70,10 +68,6 @@ impl Unit {
 
     pub fn set_liveness_probe(&mut self, probe: LivenessProbe) {
         self.probe_manager.set_liveness_probe(probe);
-    }
-
-    pub fn is_manually_stopped(&self) -> bool {
-        self.is_manually_stopped
     }
 
     pub fn get_name(&self) -> String {
@@ -144,8 +138,6 @@ impl Unit {
 
         info!("Starting unit {}", self.name);
 
-        self.is_manually_stopped = false;
-
         match self.start_dependencies() {
             Ok(_) => {}
             Err(error) => {
@@ -204,8 +196,6 @@ impl Unit {
     /// Stops the child process
     pub fn stop(&mut self) -> Result<bool, String> {
         info!("Stopping unit {}", self.name);
-
-        self.is_manually_stopped = true;
 
         // stop probes first to prevent process from being restarted during stopping
         self.stop_probes();

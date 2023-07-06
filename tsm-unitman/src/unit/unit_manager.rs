@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use log::{debug, error, warn};
+use log::{debug, error, warn, info};
 
 use crate::unit::{RestartPolicy, Unit, UnitRef};
 
@@ -157,16 +157,16 @@ impl UnitManager {
     }
 
     pub fn run_loop(&mut self) {
-        debug!("Starting units");
+        info!("Starting units");
         self.start_units();
 
-        debug!("Starting unit probes");
+        info!("Starting unit probes");
         self.start_units_probes();
 
-        debug!("Monitoring units");
+        info!("Monitoring units");
         loop {
             if self.stop_requested() {
-                debug!("Stop requested");
+                info!("Stop requested");
                 break;
             }
 
@@ -174,7 +174,7 @@ impl UnitManager {
             thread::sleep(Duration::from_secs(1));
         }
 
-        debug!("Shutting down units and their probes");
+        info!("Shutting down units and their probes");
         self.stop_units();
         self.reset_stop_request();
     }
@@ -194,7 +194,7 @@ impl UnitManager {
                 Ok(mut unit) => {
                     let is_running = unit.is_running();
 
-                    if !is_running && !unit.is_manually_stopped() {
+                    if !is_running {
                         debug!("Force stopping unit {} to make sure resources are cleaned up", unit.get_name());
                         unit.stop(); // make sure that resources are cleaned up
                     }
