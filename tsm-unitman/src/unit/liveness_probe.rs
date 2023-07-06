@@ -150,7 +150,7 @@ impl LivenessProbe {
                         match output {
                             Some(exit_status) => {
                                 if exit_status.success() {
-                                    trace!("Liveness probe for unit {} succeeded. Setting probe state to Alive.", self.name);
+                                    debug!("Liveness probe for unit {} succeeded. Setting probe state to Alive.", self.name);
                                     self.set_state(ProbeState::Alive);
                                 } else {
                                     warn!("Liveness probe for unit {} failed with exit status {}. Setting probe state to Dead.", self.name, exit_status);

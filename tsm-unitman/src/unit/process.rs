@@ -91,6 +91,7 @@ impl Process {
                 match child.try_wait() {
                     Ok(Some(exit_code)) => {
                         // Process is not running anymore
+                        self.child = None;
                         debug!("Process {} exited with code {}", self.executable, exit_code);
                         Some(ExitStatus::from(exit_code))
                     }

@@ -8,6 +8,7 @@ pub struct ProbeManager {
     unit_name: String,
     liveness_probe: Option<LivenessProbe>,
     process_probe: Option<ProcessProbe>,
+    is_running: bool,
 }
 
 
@@ -17,6 +18,7 @@ impl ProbeManager {
             unit_name,
             liveness_probe: None,
             process_probe: None,
+            is_running: false,
         };
     }
 
@@ -29,6 +31,10 @@ impl ProbeManager {
     }
 
     pub fn get_process_probe_state(&self) -> ProbeState {
+        if !self.is_running {
+            return ProbeState::Undefined;
+        }
+
         return match self.process_probe {
             Some(ref process_probe) => {
                 process_probe.get_state()
@@ -41,6 +47,10 @@ impl ProbeManager {
     }
 
     pub fn get_liveness_probe_state(&self) -> ProbeState {
+        if !self.is_running {
+            return ProbeState::Undefined;
+        }
+
         return match self.liveness_probe {
             Some(ref liveness_probe) => {
                 liveness_probe.get_state()
@@ -59,7 +69,7 @@ impl ProbeManager {
                 process_probe.run();
             },
             None => {
-                warn!("Cannot start process probe for unit {} because it is NOT defined", self.unit_name);
+                trace!("Cannot start process probe for unit {} because it is NOT defined", self.unit_name);
             }
         }
 
@@ -69,9 +79,11 @@ impl ProbeManager {
                 liveness_probe.run();
             },
             None => {
-                warn!("Cannot start liveness probe for unit {} because it is NOT defined", self.unit_name);
+                trace!("Cannot start liveness probe for unit {} because it is NOT defined", self.unit_name);
             }
         }
+
+        self.is_running = true;
     }
 
     pub fn stop_probes(&mut self) {
@@ -81,7 +93,7 @@ impl ProbeManager {
                 process_probe.request_stop();
             },
             None => {
-                warn!("Cannot start process probe for unit {} because it is NOT defined", self.unit_name);
+                trace!("Cannot stop process probe for unit {} because it is NOT defined", self.unit_name);
             }
         }
 
@@ -91,8 +103,10 @@ impl ProbeManager {
                 liveness_probe.request_stop();
             },
             None => {
-                warn!("Cannot start liveness probe for unit {} because it is NOT defined", self.unit_name);
+                trace!("Cannot start liveness probe for unit {} because it is NOT defined", self.unit_name);
             }
         }
+
+        self.is_running = false;
     }
 }

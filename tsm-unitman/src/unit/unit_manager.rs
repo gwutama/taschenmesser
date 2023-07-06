@@ -1,10 +1,10 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use log::{debug, error, warn};
 
-use crate::unit::{RestartPolicy, UnitRef};
+use crate::unit::{RestartPolicy, Unit, UnitRef};
 
 
 pub type UnitManagerRef = Arc<Mutex<UnitManager>>;
@@ -50,32 +50,16 @@ impl UnitManager {
     fn start_units(&mut self) {
         self.reset_stop_request();
 
-        // TODO: Max retries
-        while !self.all_units_running() {
-            for unit in &self.units {
-                match unit.try_lock() {
-                    Ok(mut unit) => {
-                        if !unit.is_running() {
-                            match unit.start() {
-                                Ok(_) => debug!("Started unit {}", unit.get_name()),
-                                Err(e) => warn!("Error starting unit {}: {}", unit.get_name(), e),
-                            }
-                        }
-                    }
-                    Err(e) => error!("Error acquiring lock while starting unit: {}", e),
-                }
-            }
-
-            thread::sleep(Duration::from_secs(1));
-        }
-
-        // start probes
-        // Probes are not started inside the loop above because if a unit is stopped
-        // inside the loop, it will be started again by the loop
         for unit in &self.units {
             match unit.try_lock() {
-                Ok(mut unit) => unit.start_probes(),
-                Err(e) => error!("Error acquiring lock while starting unit probes: {}", e),
+                Ok(mut unit) => {
+                    // start unit will automatically start its probes
+                    match unit.start() {
+                        Ok(_) => debug!("Started unit {}", unit.get_name()),
+                        Err(e) => warn!("Error starting unit {}: {}", unit.get_name(), e),
+                    }
+                }
+                Err(e) => error!("Error acquiring lock while starting unit: {}", e),
             }
         }
     }
@@ -176,6 +160,9 @@ impl UnitManager {
         debug!("Starting units");
         self.start_units();
 
+        debug!("Starting unit probes");
+        self.start_units_probes();
+
         debug!("Monitoring units");
         loop {
             if self.stop_requested() {
@@ -187,9 +174,18 @@ impl UnitManager {
             thread::sleep(Duration::from_secs(1));
         }
 
-        debug!("Shutting down units");
+        debug!("Shutting down units and their probes");
         self.stop_units();
         self.reset_stop_request();
+    }
+
+    fn start_units_probes(&self) {
+        for unit in &self.units {
+            match unit.try_lock() {
+                Ok(mut unit) => unit.start_probes(),
+                Err(e) => error!("Error acquiring lock while starting unit probes: {}", e),
+            }
+        }
     }
 
     fn monitor(&self) {
@@ -198,8 +194,9 @@ impl UnitManager {
                 Ok(mut unit) => {
                     let is_running = unit.is_running();
 
-                    if !is_running {
-                        unit.stop(); // force cleanup resources
+                    if !is_running && !unit.is_manually_stopped() {
+                        debug!("Force stopping unit {} to make sure resources are cleaned up", unit.get_name());
+                        unit.stop(); // make sure that resources are cleaned up
                     }
 
                     if !is_running && unit.get_restart_policy() == RestartPolicy::Always {

@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use log::{debug, warn, trace};
+use log::{debug, warn, trace, info};
 
 use crate::unit::{RestartPolicy, ProcessProbe, ProcessProbeRef, LivenessProbe, ProbeState, Process, ProbeManager};
 
@@ -15,6 +15,7 @@ pub struct Unit {
     enabled: bool,
     process: Process,
     probe_manager: ProbeManager,
+    is_manually_stopped: bool,
 }
 
 
@@ -43,6 +44,7 @@ impl Unit {
             enabled,
             process,
             probe_manager: ProbeManager::new(name.clone()),
+            is_manually_stopped: false,
         }
     }
 
@@ -68,6 +70,10 @@ impl Unit {
 
     pub fn set_liveness_probe(&mut self, probe: LivenessProbe) {
         self.probe_manager.set_liveness_probe(probe);
+    }
+
+    pub fn is_manually_stopped(&self) -> bool {
+        self.is_manually_stopped
     }
 
     pub fn get_name(&self) -> String {
@@ -121,8 +127,8 @@ impl Unit {
     /// Checks if the unit is running.
     /// Called periodically by unit manager.
     pub fn is_running(&mut self) -> bool {
-        if !self.process.is_running() {
-            return false;
+        if self.process.is_running() {
+            return true;
         }
 
         // Process might be still running, check whether its pid is still valid
@@ -134,6 +140,17 @@ impl Unit {
     pub fn start(&mut self) -> Result<bool, String> {
         if !self.can_start() {
             return Err(format!("Cannot start unit {}", self.name));
+        }
+
+        info!("Starting unit {}", self.name);
+
+        self.is_manually_stopped = false;
+
+        match self.start_dependencies() {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(format!("Unit {} failed to start dependencies: {}", self.name, error));
+            }
         }
 
         // setup process probe
@@ -151,7 +168,7 @@ impl Unit {
 
         match self.process.start() {
             Ok(_) => {
-                debug!("Unit {} was started", self.name);
+                info!("Unit {} was started", self.name);
                 Ok(true)
             }
             Err(error) => {
@@ -160,26 +177,53 @@ impl Unit {
         }
     }
 
+    fn start_dependencies(&mut self) -> Result<bool, String> {
+        for dependency in &self.dependencies {
+            match dependency.try_lock() {
+                Ok(mut unit) => {
+                    if !unit.is_running() {
+                        match unit.start() {
+                            Ok(_) => {
+                                debug!("Unit {} was started", unit.name);
+                            }
+                            Err(error) => {
+                                return Err(format!("Unit {} failed to start: {}", unit.name, error));
+                            }
+                        }
+                    }
+                },
+                Err(error) => {
+                    return Err(format!("Unit {} failed to start: {}", self.name, error));
+                }
+            }
+        }
+
+        Ok(true)
+    }
+
     /// Stops the child process
     pub fn stop(&mut self) -> Result<bool, String> {
-        if !self.can_stop() {
-            return Err(format!("Cannot stop unit {}", self.name));
-        }
+        info!("Stopping unit {}", self.name);
+
+        self.is_manually_stopped = true;
+
+        // stop probes first to prevent process from being restarted during stopping
+        self.stop_probes();
 
         match self.process.stop() {
             Ok(_) => {
                 debug!("Unit {} was stopped", self.name);
-                self.stop_probes();
                 Ok(true)
             }
             Err(error) => {
+                self.start_probes(); // restart probes since stopping process failed
                 Err(format!("Unit {} failed to stop: {}", self.name, error))
             }
         }
     }
 
     pub fn restart(&mut self) -> Result<bool, String> {
-        debug!("Restarting unit {}", self.name);
+        info!("Restarting unit {}", self.name);
         match self.process.restart() {
             Ok(_) => {
                 debug!("Unit {} was restarted", self.name);
@@ -200,7 +244,7 @@ impl Unit {
 
         // ignore if unit is running
         if self.is_running() {
-            warn!("Unit {} is already running", self.name);
+            trace!("Unit {} is already running", self.name);
             return false;
         }
 
@@ -232,7 +276,7 @@ impl Unit {
 
         // ignore if unit is stopped
         if !self.is_running() {
-            warn!("Unit {} is already stopped", self.name);
+            trace!("Unit {} is already stopped", self.name);
             return false;
         }
 
@@ -245,15 +289,12 @@ impl Unit {
             return;
         }
 
+        trace!("Starting probes for unit {}", self.name);
         self.probe_manager.start_probes();
     }
 
     fn stop_probes(&mut self) {
-        if !self.is_running() {
-            warn!("Cannot stop probes for unit {} because it is NOT running", self.name);
-            return;
-        }
-
+        trace!("Stopping probes for unit {}", self.name);
         self.probe_manager.stop_probes();
     }
 }
