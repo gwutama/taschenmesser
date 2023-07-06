@@ -20,7 +20,7 @@ pub struct LivenessProbe {
     timeout_s: i32,
     interval_s: i32,
     state: Arc<Mutex<ProbeState>>,
-    stop_requested: Arc<Mutex<bool>>,
+    stop_requested: bool,
     probe_timestamp: Instant,
 }
 
@@ -42,7 +42,7 @@ impl LivenessProbe {
             timeout_s,
             interval_s,
             state: Arc::new(Mutex::new(ProbeState::Undefined)),
-            stop_requested: Arc::new(Mutex::new(false)),
+            stop_requested: false,
             probe_timestamp: Instant::now(),
         };
     }
@@ -82,22 +82,9 @@ impl LivenessProbe {
         };
     }
 
-    fn stop_requested(&self) -> bool {
-        return match self.stop_requested.try_lock() {
-            Ok(stop_requested) => *stop_requested,
-            Err(e) => {
-                error!("Failed to lock stop_requested: {}", e);
-                false
-            }
-        };
-    }
-
     /// Set stop_requested flag to true
     pub fn request_stop(&mut self) {
-        match self.stop_requested.try_lock() {
-            Ok(mut stop_requested) => *stop_requested = true,
-            Err(e) => error!("Failed to lock stop_requested: {}", e),
-        };
+        self.stop_requested = true;
     }
 
     pub fn run(&self) -> JoinHandle<()> {
@@ -110,7 +97,7 @@ impl LivenessProbe {
         debug!("Liveness probe for unit {} starting", self.name);
 
         loop {
-            if self.stop_requested() {
+            if self.stop_requested {
                 debug!("Liveness probe for unit {} stop requested", self.name);
                 break;
             }
@@ -124,6 +111,8 @@ impl LivenessProbe {
         }
 
         self.set_state(ProbeState::Dead);
+        self.stop_requested = false;
+
         debug!("Liveness probe for unit {} stopped", self.name);
     }
 

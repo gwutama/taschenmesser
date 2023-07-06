@@ -18,7 +18,7 @@ pub struct ProcessProbe {
     interval_s: i32,
     system_info: Arc<Mutex<System>>,
     state: Arc<Mutex<ProbeState>>,
-    stop_requested: Arc<Mutex<bool>>,
+    stop_requested: bool,
     probe_timestamp: Instant,
 }
 
@@ -35,7 +35,7 @@ impl ProcessProbe {
             interval_s,
             system_info: Arc::new(Mutex::new(System::new())),
             state: Arc::new(Mutex::new(ProbeState::Undefined)),
-            stop_requested: Arc::new(Mutex::new(false)),
+            stop_requested: false,
             probe_timestamp: Instant::now(),
         };
     }
@@ -59,24 +59,9 @@ impl ProcessProbe {
         };
     }
 
-    fn stop_requested(&self) -> bool {
-        return match self.stop_requested.try_lock() {
-            Ok(stop_requested) => *stop_requested,
-            Err(e) => {
-                error!("Process probe for unit {} failed to lock stop_requested: {}", self.name, e);
-                false
-            }
-        };
-    }
-
     /// Set stop_requested flag to true
     pub fn request_stop(&mut self) {
-        match self.stop_requested.try_lock() {
-            Ok(mut stop_requested) => *stop_requested = true,
-            Err(e) => {
-                error!("Process probe for unit {} failed to lock stop_requested: {}", self.name, e)
-            },
-        };
+        self.stop_requested = true;
     }
 
     pub fn run(&self) -> JoinHandle<()> {
@@ -89,7 +74,7 @@ impl ProcessProbe {
         debug!("Process probe for unit {} starting", self.name);
 
         loop {
-            if self.stop_requested() {
+            if self.stop_requested {
                 debug!("Process probe for unit {} stop requested", self.name);
                 break;
             }
@@ -103,6 +88,8 @@ impl ProcessProbe {
         }
 
         self.set_state(ProbeState::Dead);
+        self.stop_requested = false;
+
         debug!("Process probe for unit {} stopped", self.name);
     }
 
