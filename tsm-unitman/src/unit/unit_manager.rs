@@ -30,7 +30,7 @@ impl UnitManager {
     }
 
     pub fn add_unit(&mut self, unit: UnitRef) {
-        match unit.lock() {
+        match unit.try_lock() {
             Ok(unit_unlocked) => {
                 debug!("Adding unit {:?}", unit_unlocked);
                 self.units.push(unit.clone());
@@ -53,7 +53,7 @@ impl UnitManager {
         // TODO: Max retries
         while !self.all_units_running() {
             for unit in &self.units {
-                match unit.lock() {
+                match unit.try_lock() {
                     Ok(mut unit) => {
                         if !unit.is_running() {
                             match unit.start() {
@@ -76,7 +76,7 @@ impl UnitManager {
         // TODO: Max retries
         while !self.all_units_stopped() {
             for unit in &self.units {
-                match unit.lock() {
+                match unit.try_lock() {
                     Ok(mut unit) => {
                         match unit.stop() {
                             Ok(_) => debug!("Stopped unit {}", unit.get_name()),
@@ -95,7 +95,7 @@ impl UnitManager {
     /// Returns false if at least one unit is not running
     fn all_units_running(&self) -> bool {
         for unit in &self.units {
-            match unit.lock() {
+            match unit.try_lock() {
                 Ok(unit) => {
                     if !unit.is_running() {
                         return false;
@@ -115,7 +115,7 @@ impl UnitManager {
     /// Returns false if at least one unit is not stopped
     fn all_units_stopped(&self) -> bool {
         for unit in &self.units {
-            match unit.lock() {
+            match unit.try_lock() {
                 Ok(unit) => {
                     if unit.is_running() {
                         return false;
@@ -132,7 +132,7 @@ impl UnitManager {
     }
 
     fn stop_requested(&self) -> bool {
-        return match self.stop_requested.lock() {
+        return match self.stop_requested.try_lock() {
             Ok(stop_requested) => *stop_requested,
             Err(e) => {
                 error!("Failed to lock stop_requested: {}", e);
@@ -143,7 +143,7 @@ impl UnitManager {
 
     /// Set stop_requested flag to true
     pub fn request_stop(&mut self) {
-        match self.stop_requested.lock() {
+        match self.stop_requested.try_lock() {
             Ok(mut stop_requested) => {
                 *stop_requested = true;
             },
@@ -153,7 +153,7 @@ impl UnitManager {
 
     /// reset stop_requested to false
     pub fn reset_stop_request(&mut self) {
-        match self.stop_requested.lock() {
+        match self.stop_requested.try_lock() {
             Ok(mut stop_requested) => *stop_requested = false,
             Err(e) => error!("Failed to lock stop_requested: {}", e),
         };
@@ -189,7 +189,7 @@ impl UnitManager {
 
     fn monitor(&self) {
         for unit in &self.units {
-            match unit.lock() {
+            match unit.try_lock() {
                 Ok(mut unit) => {
                     if !unit.is_running() && unit.get_restart_policy() == RestartPolicy::Always {
                         debug!("Unit {} is not running, restarting because restart policy was set to Always.", unit.get_name());

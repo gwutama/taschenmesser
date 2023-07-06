@@ -56,7 +56,7 @@ impl RpcServer {
                 Some(request) => {
                     debug!("Received request: {:?}", request);
 
-                    match self.request_handler.lock() {
+                    match self.request_handler.try_lock() {
                         Ok(request_handler) => {
                             Some(request_handler.handle_request(request))
                         },

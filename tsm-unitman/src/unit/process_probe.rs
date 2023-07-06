@@ -39,7 +39,7 @@ impl ProcessProbe {
     }
 
     pub fn get_state(&self) -> ProbeState {
-        match self.state.lock() {
+        match self.state.try_lock() {
             Ok(state) => state.clone(),
             Err(e) => {
                 error!("Process probe for unit {} failed to lock state: {}", self.name, e);
@@ -49,7 +49,7 @@ impl ProcessProbe {
     }
 
     fn set_state(&mut self, new_state: ProbeState) {
-        match self.state.lock() {
+        match self.state.try_lock() {
             Ok(mut state) => *state = new_state.clone(),
             Err(e) => {
                 error!("Process probe for unit {} failed to lock state: {}", self.name, e)
@@ -58,7 +58,7 @@ impl ProcessProbe {
     }
 
     fn stop_requested(&self) -> bool {
-        return match self.stop_requested.lock() {
+        return match self.stop_requested.try_lock() {
             Ok(stop_requested) => *stop_requested,
             Err(e) => {
                 error!("Process probe for unit {} failed to lock stop_requested: {}", self.name, e);
@@ -69,7 +69,7 @@ impl ProcessProbe {
 
     /// Set stop_requested flag to true
     pub fn request_stop(&mut self) {
-        match self.stop_requested.lock() {
+        match self.stop_requested.try_lock() {
             Ok(mut stop_requested) => *stop_requested = true,
             Err(e) => {
                 error!("Process probe for unit {} failed to lock stop_requested: {}", self.name, e)
@@ -112,7 +112,7 @@ impl ProcessProbe {
     }
 
     fn pid_exists(&self, pid: u32) -> bool {
-        return match self.system_info.lock() {
+        return match self.system_info.try_lock() {
             Ok(mut system_info) => {
                 let sysinfo_pid = Pid::from_u32(pid);
                 let refresh = ProcessRefreshKind::new();

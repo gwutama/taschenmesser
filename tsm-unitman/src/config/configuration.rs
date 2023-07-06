@@ -58,7 +58,7 @@ impl Configuration {
 
             units.push(unit_ref.clone());
 
-            match unit_ref.lock() {
+            match unit_ref.try_lock() {
                 Ok(unit) => {
                     unit_map.insert(unit.get_name().clone(), unit_ref.clone());
                 },
@@ -87,7 +87,7 @@ impl Configuration {
                     }
                 };
 
-                match unit_ref.lock() {
+                match unit_ref.try_lock() {
                     Ok(mut unit) => {
                         unit.add_dependency(dependency_unit_ref.clone());
                     },

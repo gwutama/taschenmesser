@@ -129,7 +129,7 @@ impl ResponseHandler {
 
         let mut list_units_response = tsm_unitman_rpc::ListUnitsResponse::new();
 
-        match self.unit_manager.lock() {
+        match self.unit_manager.try_lock() {
             Ok(unit_manager) => {
                 list_units_response.units = self.convert_units_to_proto(&unit_manager.get_units())
             },
@@ -168,7 +168,7 @@ impl ResponseHandler {
 
     /// TODO: Move to rpc_server::Converter
     fn convert_unit_to_proto(&self, unit: &unit::UnitRef) -> Result<tsm_unitman_rpc::Unit, String> {
-        match unit.lock() {
+        match unit.try_lock() {
             Ok(mut unit) => {
                 let mut proto_unit = tsm_unitman_rpc::Unit::new();
 

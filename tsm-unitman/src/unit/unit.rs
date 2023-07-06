@@ -119,7 +119,7 @@ impl Unit {
     pub fn get_process_probe_state(&self) -> ProbeState {
         return match self.process_probe {
             Some(ref process_probe) => {
-                match process_probe.lock() {
+                match process_probe.try_lock() {
                     Ok(process_probe) => {
                         let probe_state = process_probe.get_state();
                         trace!("Unit {} process probe state: {:?}", self.name, probe_state);
@@ -141,7 +141,7 @@ impl Unit {
     pub fn get_liveness_probe_state(&self) -> ProbeState {
         return match self.liveness_probe {
             Some(ref liveness_probe) => {
-                match liveness_probe.lock() {
+                match liveness_probe.try_lock() {
                     Ok(liveness_probe) => {
                         liveness_probe.get_state()
                     }
@@ -249,7 +249,7 @@ impl Unit {
         }
 
         for dependency in &self.dependencies {
-            match dependency.lock() {
+            match dependency.try_lock() {
                 Ok(unit) => {
                     if !unit.is_running() {
                         // dependency is not running, so we cannot start
@@ -304,7 +304,7 @@ impl Unit {
         // Start liveness probe
         match self.liveness_probe {
             Some(ref liveness_probe) => {
-                match liveness_probe.lock() {
+                match liveness_probe.try_lock() {
                     Ok(liveness_probe) => {
                         liveness_probe.run();
                     }
@@ -321,7 +321,7 @@ impl Unit {
         // Stop process probe
         match self.process_probe {
             Some(ref process_probe) => {
-                match process_probe.lock() {
+                match process_probe.try_lock() {
                     Ok(mut process_probe) => {
                         process_probe.request_stop();
                     }
@@ -336,7 +336,7 @@ impl Unit {
         // Stop liveness probe
         match self.liveness_probe {
             Some(ref liveness_probe) => {
-                match liveness_probe.lock() {
+                match liveness_probe.try_lock() {
                     Ok(mut liveness_probe) => {
                         liveness_probe.request_stop();
                     }

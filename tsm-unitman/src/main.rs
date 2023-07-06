@@ -53,7 +53,7 @@ fn init_unit_manager_or_exit(configuration: &config::Configuration) -> unit::Uni
     let manager = unit::UnitManager::new_ref();
     let units = configuration.build_units();
 
-    match manager.lock() {
+    match manager.try_lock() {
         Ok(mut manager) => {
             for unit in units {
                 manager.add_unit(unit);
@@ -86,7 +86,7 @@ fn main() {
     }
 
     // start unit manager
-    match manager.lock() {
+    match manager.try_lock() {
         Ok(mut manager) => {
             let handle = manager.run();
             handle.join().expect("Error joining unit manager thread");

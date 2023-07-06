@@ -66,7 +66,7 @@ impl LivenessProbe {
     }
 
     fn stop_requested(&self) -> bool {
-        return match self.stop_requested.lock() {
+        return match self.stop_requested.try_lock() {
             Ok(stop_requested) => *stop_requested,
             Err(e) => {
                 error!("Failed to lock stop_requested: {}", e);
@@ -77,7 +77,7 @@ impl LivenessProbe {
 
     /// Set stop_requested flag to true
     pub fn request_stop(&mut self) {
-        match self.stop_requested.lock() {
+        match self.stop_requested.try_lock() {
             Ok(mut stop_requested) => *stop_requested = true,
             Err(e) => error!("Failed to lock stop_requested: {}", e),
         };
