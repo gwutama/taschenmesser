@@ -210,7 +210,10 @@ impl UnitManager {
                     if !is_running && unit.get_restart_policy() == RestartPolicy::Always {
                         debug!("Unit {} is not running, restarting because restart policy was set to Always.", unit.get_name());
                         match unit.restart() {
-                            Ok(_) => debug!("Unit {} restarted", unit.get_name()),
+                            Ok(_) => {
+                                debug!("Unit {} restarted", unit.get_name());
+                                unit.start_probes();
+                            },
                             Err(e) => warn!("Error restarting unit {}: {}", unit.get_name(), e),
                         }
                     }
