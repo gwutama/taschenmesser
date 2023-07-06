@@ -1,6 +1,6 @@
 use std::io::Error;
 use std::process::{Command, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use process_control::{ChildExt, Control, ExitStatus};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -21,6 +21,7 @@ pub struct LivenessProbe {
     interval_s: i32,
     state: Arc<Mutex<ProbeState>>,
     stop_requested: Arc<Mutex<bool>>,
+    probe_timestamp: Instant,
 }
 
 
@@ -42,6 +43,7 @@ impl LivenessProbe {
             interval_s,
             state: Arc::new(Mutex::new(ProbeState::Undefined)),
             stop_requested: Arc::new(Mutex::new(false)),
+            probe_timestamp: Instant::now(),
         };
     }
 
@@ -104,7 +106,6 @@ impl LivenessProbe {
     }
 
     /// Run probe() endlessly in a loop
-    /// interval_s: 0 means no interval (run once)
     fn run_loop(&mut self) {
         debug!("Liveness probe for unit {} starting", self.name);
 
@@ -114,17 +115,22 @@ impl LivenessProbe {
                 break;
             }
 
-            self.probe();
-
-            if self.interval_s == 0 {
-                break;
+            if self.is_time_to_probe() {
+                self.probe();
+                self.probe_timestamp = Instant::now();
             }
 
-            thread::sleep(Duration::from_secs(self.interval_s as u64));
+            thread::sleep(Duration::from_millis(500));
         }
 
         self.set_state(ProbeState::Dead);
         debug!("Liveness probe for unit {} stopped", self.name);
+    }
+
+    fn is_time_to_probe(&self) -> bool {
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.probe_timestamp);
+        return elapsed.as_secs() >= self.interval_s as u64;
     }
 
     /// timeout_s: 0 means no timeout

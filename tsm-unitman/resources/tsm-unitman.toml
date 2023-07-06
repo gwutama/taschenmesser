@@ -16,7 +16,7 @@ group = ""                              # Optional. Defaults to current group.
 enabled = true                          # Optional. Defaults to true.
 liveness_probe.executable = "ls"        # Optional. Defaults to empty string.
 liveness_probe.arguments = ["/tmp"]     # Optional. Defaults to empty list.
-liveness_probe.interval_s = 20          # Optional. Defaults to 60.
+liveness_probe.interval_s = 5          # Optional. Defaults to 60.
 liveness_probe.timeout_s = 5            # Optional. Defaults to 10.
 
 [[units]]
@@ -30,5 +30,5 @@ group = ""                              # Optional. Defaults to current group.
 enabled = true                          # Optional. Defaults to true.
 liveness_probe.executable = "ls"        # Optional. Defaults to empty string.
 liveness_probe.arguments = ["/tmp"]     # Optional. Defaults to empty list.
-liveness_probe.interval_s = 20          # Optional. Defaults to 60.
+liveness_probe.interval_s = 5          # Optional. Defaults to 60.
 liveness_probe.timeout_s = 5            # Optional. Defaults to 10.
