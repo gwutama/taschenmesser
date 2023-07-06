@@ -42,7 +42,7 @@ impl ProcessProbe {
         match self.state.try_lock() {
             Ok(state) => state.clone(),
             Err(e) => {
-                error!("Process probe for unit {} failed to lock state: {}", self.name, e);
+                error!("Liveness probe for unit {} failed to lock state: {}", self.name, e);
                 ProbeState::Undefined
             }
         }
@@ -52,7 +52,7 @@ impl ProcessProbe {
         match self.state.try_lock() {
             Ok(mut state) => *state = new_state.clone(),
             Err(e) => {
-                error!("Process probe for unit {} failed to lock state: {}", self.name, e)
+                error!("Liveness probe for unit {} failed to lock state: {}", self.name, e)
             },
         };
     }

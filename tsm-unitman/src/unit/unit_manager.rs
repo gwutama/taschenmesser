@@ -58,10 +58,10 @@ impl UnitManager {
                         continue;
                     }
 
-                    info!("Starting unit {}", unit.get_name());
+                    debug!("Starting unit {}", unit.get_name());
 
                     match unit.start() {
-                        Ok(_) => info!("Started unit {}", unit.get_name()),
+                        Ok(_) => debug!("Started unit {}", unit.get_name()),
                         Err(e) => warn!("Error starting unit {}: {}", unit.get_name(), e),
                     }
                 }

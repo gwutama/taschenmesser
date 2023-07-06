@@ -145,27 +145,29 @@ impl Unit {
             }
         }
 
-        // setup process probe
-        match self.process.get_pid() {
-            Some(pid) => {
-                let process_probe = ProcessProbe::new(
-                    self.name.clone(),
-                    self.process.get_pid().unwrap(),
-                    5,
-                );
-                self.probe_manager.set_process_probe(process_probe);
-            },
-            None => {}
-        }
-
         match self.process.start() {
             Ok(_) => {
                 debug!("Unit {} was started", self.name);
+                self.init_process_probe();
                 Ok(true)
             }
             Err(error) => {
                 Err(format!("Unit {} failed to start: {}", self.name, error))
             }
+        }
+    }
+
+    fn init_process_probe(&mut self) {
+        match self.process.get_pid() {
+            Some(pid) => {
+                let process_probe = ProcessProbe::new(
+                    self.name.clone(),
+                    pid,
+                    5,
+                );
+                self.probe_manager.set_process_probe(process_probe);
+            },
+            None => {}
         }
     }
 
