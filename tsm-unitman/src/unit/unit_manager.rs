@@ -170,10 +170,7 @@ impl UnitManager {
 
         debug!("Monitoring units");
         loop {
-            let stop_requested = self.stop_requested();
-            debug!("Stop requested: {}", stop_requested);
-
-            if stop_requested {
+            if self.stop_requested() {
                 debug!("Stop requested");
                 break;
             }

@@ -134,6 +134,7 @@ impl ResponseHandler {
                 list_units_response.units = self.convert_units_to_proto(&unit_manager.get_units())
             },
             Err(error) => {
+                warn!("Failed to lock unit manager: {}", error);
                 rpc_response.status = false;
                 rpc_response.error = format!("Failed to lock unit manager: {}", error);
                 return rpc_response;
