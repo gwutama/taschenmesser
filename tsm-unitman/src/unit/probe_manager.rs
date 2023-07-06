@@ -69,7 +69,7 @@ impl ProbeManager {
                 process_probe.run();
             },
             None => {
-                trace!("Cannot start process probe for unit {} because it is NOT defined", self.unit_name);
+                trace!("Cannot start process probe for unit {} because it is not set", self.unit_name);
             }
         }
 
@@ -79,7 +79,7 @@ impl ProbeManager {
                 liveness_probe.run();
             },
             None => {
-                trace!("Cannot start liveness probe for unit {} because it is NOT defined", self.unit_name);
+                trace!("Cannot start liveness probe for unit {} because it is not set", self.unit_name);
             }
         }
 
@@ -93,7 +93,7 @@ impl ProbeManager {
                 process_probe.request_stop();
             },
             None => {
-                trace!("Cannot stop process probe for unit {} because it is NOT defined", self.unit_name);
+                trace!("Cannot stop process probe for unit {} because it is not set", self.unit_name);
             }
         }
 
@@ -103,7 +103,7 @@ impl ProbeManager {
                 liveness_probe.request_stop();
             },
             None => {
-                trace!("Cannot start liveness probe for unit {} because it is NOT defined", self.unit_name);
+                trace!("Cannot start liveness probe for unit {} because it is not set", self.unit_name);
             }
         }
 

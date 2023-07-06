@@ -53,9 +53,15 @@ impl UnitManager {
         for unit in &self.units {
             match unit.try_lock() {
                 Ok(mut unit) => {
-                    // start unit will automatically start its probes
+                    if unit.is_running() {
+                        debug!("Unit {} is already running", unit.get_name());
+                        continue;
+                    }
+
+                    info!("Starting unit {}", unit.get_name());
+
                     match unit.start() {
-                        Ok(_) => debug!("Started unit {}", unit.get_name()),
+                        Ok(_) => info!("Started unit {}", unit.get_name()),
                         Err(e) => warn!("Error starting unit {}: {}", unit.get_name(), e),
                     }
                 }
@@ -70,9 +76,11 @@ impl UnitManager {
         for unit in &self.units {
             match unit.try_lock() {
                 Ok(mut unit) => {
+                    info!("Stopping unit {}", unit.get_name());
+
                     // stopping unit will automatically stop its probes and cleanup its resources
                     match unit.stop() {
-                        Ok(_) => debug!("Stopped unit {}", unit.get_name()),
+                        Ok(_) => info!("Stopped unit {}", unit.get_name()),
                         Err(e) => warn!("Error stopping unit {}: {}", unit.get_name(), e),
                     }
                 }

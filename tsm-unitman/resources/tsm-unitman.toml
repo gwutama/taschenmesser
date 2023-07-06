@@ -6,11 +6,11 @@ enabled = true                                      # Optional. Defaults to fals
 bind_address = "ipc:///tmp/tsm-unitman.sock"    # Optional. Defaults to "ipc:///tmp/tsm-unitman.sock".
 
 [[units]]
-name = "foo"                            # Mandatory
-executable = "sleep"                    # Mandatory
-arguments = [ "30" ]                    # Optional. Defaults to empty list.
-dependencies = []                       # Optional. Defaults to empty list.
-restart_policy = "always"               # Optional. Defaults to "always". Possible values: "always", "never".
+name = "bar"                            # Mandatory
+executable = "ls"                       # Mandatory
+arguments = [ "-lah" ]                  # Optional. Defaults to empty list.
+dependencies = [ "foo" ]                # Optional. Defaults to empty list.
+restart_policy = "never"                # Optional. Defaults to "always". Possible values: "always", "never".
 user = ""                               # Optional. Defaults to current user.
 group = ""                              # Optional. Defaults to current group.
 enabled = true                          # Optional. Defaults to true.
@@ -20,11 +20,11 @@ liveness_probe.interval_s = 20          # Optional. Defaults to 60.
 liveness_probe.timeout_s = 5            # Optional. Defaults to 10.
 
 [[units]]
-name = "bar"                            # Mandatory
-executable = "ls"                       # Mandatory
-arguments = [ "-lah" ]                  # Optional. Defaults to empty list.
-dependencies = [ "foo" ]                # Optional. Defaults to empty list.
-restart_policy = "never"                # Optional. Defaults to "always". Possible values: "always", "never".
+name = "foo"                            # Mandatory
+executable = "sleep"                    # Mandatory
+arguments = [ "30" ]                    # Optional. Defaults to empty list.
+dependencies = []                       # Optional. Defaults to empty list.
+restart_policy = "always"               # Optional. Defaults to "always". Possible values: "always", "never".
 user = ""                               # Optional. Defaults to current user.
 group = ""                              # Optional. Defaults to current group.
 enabled = true                          # Optional. Defaults to true.
