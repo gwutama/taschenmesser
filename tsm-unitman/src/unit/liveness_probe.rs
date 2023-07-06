@@ -164,8 +164,8 @@ impl LivenessProbe {
                                 }
                             }
                             None => {
-                                warn!("Liveness probe for unit {} failed due timeout. Setting probe state to Dead.", self.name);
-                                self.set_state(ProbeState::Dead);
+                                warn!("Liveness probe for unit {} succeeded before timeout. Setting probe state to Alive.", self.name);
+                                self.set_state(ProbeState::Alive);
                             }
                         }
                     },
