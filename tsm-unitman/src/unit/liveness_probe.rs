@@ -19,7 +19,7 @@ pub struct LivenessProbe {
     arguments: Vec<String>,
     timeout_s: i32,
     interval_s: i32,
-    state: ProbeState,
+    state: Arc<Mutex<ProbeState>>,
     stop_requested: Arc<Mutex<bool>>,
 }
 
@@ -40,7 +40,7 @@ impl LivenessProbe {
             arguments,
             timeout_s,
             interval_s,
-            state: ProbeState::Undefined,
+            state: Arc::new(Mutex::new(ProbeState::Undefined)),
             stop_requested: Arc::new(Mutex::new(false)),
         };
     }
@@ -62,7 +62,22 @@ impl LivenessProbe {
     }
 
     pub fn get_state(&self) -> ProbeState {
-        return self.state.clone();
+        match self.state.try_lock() {
+            Ok(state) => state.clone(),
+            Err(e) => {
+                error!("Liveness probe for unit {} failed to lock state: {}", self.name, e);
+                ProbeState::Undefined
+            }
+        }
+    }
+
+    fn set_state(&mut self, new_state: ProbeState) {
+        match self.state.try_lock() {
+            Ok(mut state) => *state = new_state.clone(),
+            Err(e) => {
+                error!("Liveness probe for unit {} failed to lock state: {}", self.name, e)
+            },
+        };
     }
 
     fn stop_requested(&self) -> bool {
@@ -130,28 +145,28 @@ impl LivenessProbe {
                         match output {
                             Some(exit_status) => {
                                 if exit_status.success() {
-                                    trace!("Probe successful");
-                                    self.state = ProbeState::Alive;
+                                    trace!("Liveness probe for unit {} succeeded. Setting probe state to Alive.", self.name);
+                                    self.set_state(ProbeState::Alive);
                                 } else {
-                                    warn!("Process exited with non-zero exit code: {}", exit_status);
-                                    self.state = ProbeState::Dead;
+                                    warn!("Liveness probe for unit {} failed with exit status {}. Setting probe state to Dead.", self.name, exit_status);
+                                    self.set_state(ProbeState::Dead);
                                 }
                             }
                             None => {
-                                warn!("Process timed out after {} seconds", self.timeout_s);
-                                self.state = ProbeState::Undefined;
+                                warn!("Liveness probe for unit {} failed due timeout. Setting probe state to Dead.", self.name);
+                                self.set_state(ProbeState::Dead);
                             }
                         }
                     },
                     Err(e) => {
-                        warn!("Failed executing command {}: {}", self.executable, e);
-                        self.state = ProbeState::Undefined;
+                        warn!("Liveness probe for unit {} failed: {}. Setting probe state to Undefined.", self.name, e);
+                        self.set_state(ProbeState::Undefined);
                     }
                 }
             }
             Err(e) => {
-                warn!("Failed executing command {}: {}", self.executable, e);
-                self.state = ProbeState::Undefined;
+                warn!("Liveness probe for unit {} failed when executing command {}: {}. Setting probe state to Undefined.", self.name, self.executable, e);
+                self.set_state(ProbeState::Undefined);
             }
         }
     }

@@ -103,10 +103,10 @@ impl ProcessProbe {
 
     fn probe(&mut self, pid: u32) {
         if self.pid_exists(pid) {
-            debug!("Process probe for unit {} (pid={}) exists. Setting probe state to Alive.", self.name, pid);
+            debug!("Process probe for unit {} succeeded (pid={}). Setting probe state to Alive.", self.name, pid);
             self.set_state(ProbeState::Alive);
         } else {
-            warn!("Process probe for unit {} (pid={}) does not exist. Setting probe state to Dead.", self.name, pid);
+            warn!("Process probe for unit {} failed pid={} does not exist. Setting probe state to Dead.", self.name, pid);
             self.set_state(ProbeState::Dead);
         }
     }
