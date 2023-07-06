@@ -85,6 +85,8 @@ impl ProcessProbe {
     /// Run probe() endlessly in a loop
     /// interval_s: 0 means no interval (run once)
     fn run_loop(&mut self) {
+        debug!("Process probe for unit {} starting", self.name);
+
         loop {
             if self.stop_requested() {
                 debug!("Process probe for unit {} stop requested", self.name);
@@ -99,6 +101,9 @@ impl ProcessProbe {
 
             thread::sleep(Duration::from_secs(self.interval_s as u64));
         }
+
+        self.set_state(ProbeState::Dead);
+        debug!("Process probe for unit {} stopped", self.name);
     }
 
     fn probe(&mut self, pid: u32) {

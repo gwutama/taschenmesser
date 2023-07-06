@@ -106,9 +106,11 @@ impl LivenessProbe {
     /// Run probe() endlessly in a loop
     /// interval_s: 0 means no interval (run once)
     fn run_loop(&mut self) {
+        debug!("Liveness probe for unit {} starting", self.name);
+
         loop {
             if self.stop_requested() {
-                debug!("Stop requested");
+                debug!("Liveness probe for unit {} stop requested", self.name);
                 break;
             }
 
@@ -120,6 +122,9 @@ impl LivenessProbe {
 
             thread::sleep(Duration::from_secs(self.interval_s as u64));
         }
+
+        self.set_state(ProbeState::Dead);
+        debug!("Liveness probe for unit {} stopped", self.name);
     }
 
     /// timeout_s: 0 means no timeout
