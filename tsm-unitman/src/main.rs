@@ -86,14 +86,17 @@ fn main() {
     }
 
     // start unit manager
+    let handle: std::thread::JoinHandle<()>;
+
     match manager.try_lock() {
         Ok(mut manager) => {
-            let handle = manager.run();
-            handle.join().expect("Error joining unit manager thread");
+            handle = manager.run();
         },
         Err(e) => {
             error!("Error acquiring lock: {}", e);
             exit(20);
         }
     };
+
+    handle.join().expect("Error joining unit manager thread");
 }
