@@ -209,15 +209,12 @@ impl Unit {
 
     pub fn restart(&mut self) -> Result<bool, String> {
         debug!("Restarting unit {}", self.name);
-        match self.process.restart() {
-            Ok(_) => {
-                debug!("Unit {} was restarted", self.name);
-                Ok(true)
-            }
-            Err(error) => {
-                Err(format!("Unit {} failed to restart: {}", self.name, error))
-            }
+
+        if self.is_running() {
+            self.stop()?;
         }
+
+        self.start()
     }
 
     /// A unit is allowed to start if it is enabled and all dependencies are running
