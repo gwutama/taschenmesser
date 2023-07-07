@@ -7,6 +7,7 @@ use serde::de::Error;
 pub enum RestartPolicy {
     Always,
     Never,
+    DisabledTemporarily,
 }
 
 
@@ -26,15 +27,10 @@ impl FromStr for RestartPolicy {
 
     fn from_str(policy: &str) -> Result<Self, Self::Err> {
         match policy.to_lowercase().as_str() {
-            "always" => {
-                Ok(RestartPolicy::Always)
-            }
-            "never" => {
-                Ok(RestartPolicy::Never)
-            }
-            _ => {
-                Err(format!("Invalid restart policy: {}", policy))
-            }
+            "always" => Ok(RestartPolicy::Always),
+            "never" => Ok(RestartPolicy::Never),
+            "disabled*" => Ok(RestartPolicy::DisabledTemporarily),
+            _ => Err(format!("Invalid restart policy: {}", policy)),
         }
     }
 }

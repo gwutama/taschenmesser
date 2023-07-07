@@ -70,7 +70,7 @@ impl UnitManager {
         }
     }
 
-    pub fn stop_unit(&self, name: String) -> Result<bool, String> {
+    pub fn stop_unit(&self, name: String, restart: bool) -> Result<bool, String> {
         for unit in &self.units {
             match unit.try_lock() {
                 Ok(mut unit) => {
@@ -80,6 +80,7 @@ impl UnitManager {
                         // stopping unit will automatically stop its probes and cleanup its resources
                         return match unit.stop() {
                             Ok(_) => {
+                                unit.set_restart_policy(RestartPolicy::DisabledTemporarily);
                                 info!("Stopped unit {}", unit.get_name());
                                 Ok(true)
                             },
@@ -204,8 +205,8 @@ impl UnitManager {
                         debug!("Unit {} is not running, restarting because restart policy was set to Always.", unit.get_name());
                         match unit.restart() {
                             Ok(_) => {
-                                debug!("Unit {} restarted", unit.get_name());
                                 unit.start_probes();
+                                debug!("Unit {} restarted", unit.get_name());
                             },
                             Err(e) => warn!("Error restarting unit {}: {}", unit.get_name(), e),
                         }

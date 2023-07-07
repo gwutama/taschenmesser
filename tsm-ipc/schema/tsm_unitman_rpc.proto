@@ -47,6 +47,7 @@ message Unit {
   enum RestartPolicy {
     Always = 0;
     Never = 1;
+    DisabledTemporarily = 2;
   }
 
   enum ProbeState {

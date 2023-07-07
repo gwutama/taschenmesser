@@ -174,7 +174,7 @@ impl ResponseHandler {
 
         match self.unit_manager.try_lock() {
             Ok(unit_manager) => {
-                match unit_manager.stop_unit(String::from(stop_unit_request.unit_name)) {
+                match unit_manager.stop_unit(String::from(stop_unit_request.unit_name), false) {
                     Ok(_) => {
                         rpc_response.status = true;
                     },

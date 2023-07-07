@@ -44,6 +44,7 @@ pub fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
             Some(policy) => match policy {
                 tsm_unitman_rpc::unit::RestartPolicy::Always => String::from("Always"),
                 tsm_unitman_rpc::unit::RestartPolicy::Never => String::from("Never"),
+                tsm_unitman_rpc::unit::RestartPolicy::DisabledTemporarily => String::from("Disabled*"),
             },
             None => String::from("Unknown"),
         };

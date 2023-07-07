@@ -70,6 +70,10 @@ impl Unit {
         self.restart_policy.clone()
     }
 
+    pub fn set_restart_policy(&mut self, policy: RestartPolicy) {
+        self.restart_policy = policy;
+    }
+
     pub fn get_uid(&self) -> u32 {
         self.process.get_uid()
     }
@@ -168,16 +172,13 @@ impl Unit {
     pub fn stop(&mut self) -> Result<bool, String> {
         debug!("Stopping unit {}", self.name);
 
-        // stop probes first to prevent process from being restarted during stopping
-        self.stop_probes();
-
         match self.process.stop() {
             Ok(_) => {
+                self.stop_probes();
                 debug!("Unit {} was stopped", self.name);
                 Ok(true)
             }
             Err(error) => {
-                self.start_probes(); // restart probes since stopping process failed
                 Err(format!("Unit {} failed to stop: {}", self.name, error))
             }
         }
