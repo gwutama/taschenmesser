@@ -70,6 +70,36 @@ impl UnitManager {
         }
     }
 
+    pub fn stop_unit(&self, name: String) -> Result<bool, String> {
+        for unit in &self.units {
+            match unit.try_lock() {
+                Ok(mut unit) => {
+                    if unit.get_name() == name {
+                        info!("Stopping unit {}", unit.get_name());
+
+                        // stopping unit will automatically stop its probes and cleanup its resources
+                        return match unit.stop() {
+                            Ok(_) => {
+                                info!("Stopped unit {}", unit.get_name());
+                                Ok(true)
+                            },
+                            Err(e) => {
+                                warn!("Error stopping unit {}: {}", unit.get_name(), e);
+                                Err(format!("Error stopping unit {}: {}", unit.get_name(), e))
+                            },
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("Error acquiring lock while stopping unit: {}", e);
+                    return Err(format!("Error acquiring lock while stopping unit: {}", e));
+                },
+            }
+        }
+
+        Err(format!("Unit {} not found", name))
+    }
+
     /// Iterate over all units and try to stop them
     /// Units will be stopped regardless of their dependencies
     fn stop_units(&mut self) {
