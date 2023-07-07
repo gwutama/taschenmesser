@@ -80,7 +80,10 @@ impl UnitManager {
                         // stopping unit will automatically stop its probes and cleanup its resources
                         return match unit.stop() {
                             Ok(_) => {
-                                unit.set_restart_policy(RestartPolicy::DisabledTemporarily);
+                                if !restart {
+                                    unit.set_restart_policy(RestartPolicy::DisabledTemporarily);
+                                }
+
                                 info!("Stopped unit {}", unit.get_name());
                                 Ok(true)
                             },

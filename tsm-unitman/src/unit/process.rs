@@ -1,3 +1,4 @@
+use std::io::ErrorKind;
 use std::process::{Child, Command, Stdio, ExitStatus};
 use std::os::unix::process::CommandExt;
 use log::{warn, debug};
@@ -9,7 +10,7 @@ pub struct Process {
     arguments: Vec<String>,
     uid: u32,
     gid: u32,
-    child: Option<Box<Child>>,
+    child: Option<Child>,
 }
 
 
@@ -47,7 +48,7 @@ impl Process {
 
     pub fn get_pid(&self) -> Option<u32> {
         return match self.child {
-            Some(ref child) => Some(child.as_ref().id()),
+            Some(ref child) => Some(child.id()),
             None => None,
         };
     }
@@ -102,7 +103,7 @@ impl Process {
         match child {
             Ok(child) => {
                 debug!("Process {} was started", self.executable);
-                self.child = Some(Box::new(child));
+                self.child = Some(child);
                 Ok(true)
             }
             Err(error) => {
@@ -123,11 +124,24 @@ impl Process {
             Some(ref mut child) => {
                 match child.kill() {
                     Ok(_) => {
-                        debug!("Process {} was stopped", self.executable);
-                        self.cleanup_process_handles();
-                        Ok(true)
+                        match child.wait() {
+                            Ok(_) => {
+                                debug!("Process {} was stopped", self.executable);
+                                self.cleanup_process_handles();
+                                Ok(true)
+                            }
+                            Err(error) => {
+                                Err(format!("Process {} failed to wait: {}", self.executable, error))
+                            }
+                        }
                     }
                     Err(error) => {
+                        if error.kind() == ErrorKind::InvalidInput {
+                            debug!("Process {} has already stopped", self.executable);
+                            self.cleanup_process_handles();
+                            return Ok(true);
+                        }
+
                         Err(format!("Process {} failed to stop: {}", self.executable, error))
                     }
                 }
