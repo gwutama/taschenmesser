@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
-use log::{debug, warn};
-use protobuf::{Message, Enum};
+use log::warn;
+use protobuf::Enum;
 
 use tsm_ipc::{tsm_common_rpc, tsm_unitman_rpc};
 use crate::rpc::{stop_unit, start_unit, list_units, ping};
