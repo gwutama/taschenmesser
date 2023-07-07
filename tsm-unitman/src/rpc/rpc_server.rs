@@ -45,7 +45,7 @@ impl tsm_ipc::RpcRequestHandler for ResponseHandler {
 
         // Handle request based on method
         match request_method {
-            tsm_unitman_rpc::RpcMethod::Ack => self.handle_ack(request),
+            tsm_unitman_rpc::RpcMethod::Ping => self.handle_ping(request),
             tsm_unitman_rpc::RpcMethod::ListUnits => self.handle_list_units(request),
             tsm_unitman_rpc::RpcMethod::StopUnit => self.handle_stop_unit(request),
             _ => self.handle_unknown(),
@@ -70,36 +70,36 @@ impl ResponseHandler {
         return rpc_response;
     }
 
-    fn handle_ack(&self, request: tsm_common_rpc::RpcRequest) -> tsm_common_rpc::RpcResponse {
+    fn handle_ping(&self, request: tsm_common_rpc::RpcRequest) -> tsm_common_rpc::RpcResponse {
         let mut rpc_response = tsm_common_rpc::RpcResponse::new();
 
-        let ack_request: tsm_unitman_rpc::AckRequest = match Message::parse_from_bytes(&request.data) {
+        let ping_request: tsm_unitman_rpc::PingRequest = match Message::parse_from_bytes(&request.data) {
             Ok(request) => {
-                rpc_response.method = tsm_unitman_rpc::RpcMethod::Ack.value();
+                rpc_response.method = tsm_unitman_rpc::RpcMethod::Ping.value();
                 request
             },
             Err(error) => {
-                warn!("Failed to parse ack request: {}", error);
-                rpc_response.method = tsm_unitman_rpc::RpcMethod::Ack.value();
+                warn!("Failed to parse ping request: {}", error);
+                rpc_response.method = tsm_unitman_rpc::RpcMethod::Ping.value();
                 rpc_response.status = false;
-                rpc_response.error = format!("Failed to parse ack request: {}", error);
+                rpc_response.error = format!("Failed to parse ping request: {}", error);
                 return rpc_response;
             },
         };
 
-        debug!("Received ack request: {}", ack_request.message);
+        debug!("Received ping request: {}", ping_request.message);
 
-        let mut ack_response = tsm_unitman_rpc::AckResponse::new();
-        ack_response.message = "pong".to_string();
+        let mut ping_response = tsm_unitman_rpc::PingResponse::new();
+        ping_response.message = "pong".to_string();
 
-        match ack_response.write_to_bytes() {
+        match ping_response.write_to_bytes() {
             Ok(bytes) => {
                 rpc_response.status = true;
                 rpc_response.data = bytes;
             },
             Err(error) => {
                 rpc_response.status = false;
-                rpc_response.error = format!("Failed to serialize ack response: {}", error);
+                rpc_response.error = format!("Failed to serialize ping response: {}", error);
             },
         }
 
