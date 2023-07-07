@@ -1,6 +1,8 @@
+use std::time::Duration;
 use tsm_ipc::{RpcClient, tsm_common_rpc, tsm_unitman_rpc};
 use protobuf::{Message, Enum};
 use tabled::{builder::Builder, settings::Style};
+use humantime::format_duration;
 
 
 pub fn send_list_units_request(rpc_client: RpcClient) -> Result<tsm_unitman_rpc::ListUnitsResponse, String> {
@@ -32,7 +34,7 @@ fn build_list_units_request() -> tsm_common_rpc::RpcRequest {
 
 pub fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
     let mut builder = Builder::new();
-    builder.set_header(vec!["UNIT NAME", "IS ENABLED", "RESTART POLICY", "RUN STATE", "PROCESS STATE", "LIVENESS STATE", "COMMAND"]);
+    builder.set_header(vec!["UNIT NAME", "IS ENABLED", "RESTART POLICY", "RUN STATE", "PROCESS STATE", "LIVENESS STATE", "UPTIME", "COMMAND"]);
 
     for unit in units {
         let enabled = match unit.enabled {
@@ -67,19 +69,26 @@ pub fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
             None => String::from("Unknown"),
         };
 
-
         let command = format!("{} {}", unit.executable, unit.arguments.join(" "));
 
+        // TODO: Consider that unit state should not based solely on pid. We need these states: Stopped, Running, Stuck
         let run_state: String = match unit.pid {
             n if n > 0 => String::from(format!("Running (pid={})", n)),
             _ => String::from("Stopped"),
         };
 
-        builder.push_record([unit.name, enabled, restart_policy, run_state, process_probe_state, liveness_probe_state, command]);
+        let uptime = if unit.pid > 0 { // if running
+            let duration = Duration::from_secs(unit.uptime);
+            format_duration(duration).to_string()
+        } else {
+            String::from("-")
+        };
+
+        builder.push_record([unit.name, enabled, restart_policy, run_state, process_probe_state, liveness_probe_state, uptime, command]);
     }
 
     let mut table = builder.build();
-    table.with(Style::modern());
+    table.with(Style::empty()); // Most compact: empty. Pretty but still compact: sharp
 
     let table = table.to_string();
     println!("{}", table);

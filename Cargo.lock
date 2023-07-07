@@ -782,6 +782,7 @@ version = "0.1.0"
 dependencies = [
  "argparse",
  "env_logger",
+ "humantime",
  "log",
  "protobuf",
  "tabled",
