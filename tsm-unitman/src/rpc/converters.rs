@@ -37,6 +37,11 @@ pub fn convert_unit_to_proto(unit: &unit::UnitRef) -> Result<tsm_unitman_rpc::Un
                 None => proto_unit.pid = -1,
             }
 
+            match unit.get_uptime() {
+                Some(uptime) => proto_unit.uptime = uptime.as_secs(),
+                None => proto_unit.uptime = 0,
+            }
+
             Ok(proto_unit)
         },
         Err(_) => {

@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use log::{debug, warn};
 
 use crate::unit::{RestartPolicy, ProcessProbe, LivenessProbe, ProbeState, Process, ProbeManager};
@@ -96,6 +97,10 @@ impl Unit {
 
     pub fn get_liveness_probe_state(&self) -> ProbeState {
         self.probe_manager.get_liveness_probe_state()
+    }
+
+    pub fn get_uptime(&self) -> Option<Duration> {
+        self.process.get_uptime()
     }
 
     /// Checks if the unit is running.

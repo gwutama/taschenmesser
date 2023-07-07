@@ -1,6 +1,7 @@
 use std::io::ErrorKind;
 use std::process::{Child, Command, Stdio, ExitStatus};
 use std::os::unix::process::CommandExt;
+use std::time::{Duration, Instant};
 use log::{warn, debug};
 
 
@@ -11,6 +12,7 @@ pub struct Process {
     uid: u32,
     gid: u32,
     child: Option<Child>,
+    start_timestamp: Option<Instant>,
 }
 
 
@@ -27,6 +29,7 @@ impl Process {
             uid,
             gid,
             child: None,
+            start_timestamp: None,
         };
     }
 
@@ -53,6 +56,16 @@ impl Process {
         };
     }
 
+    pub fn get_uptime(&self) -> Option<Duration> {
+        return match self.start_timestamp {
+            Some(timestamp) => {
+                let uptime = Instant::now().duration_since(timestamp);
+                return Some(uptime);
+            }
+            None => None,
+        };
+    }
+
     /// Checks if the process is running.
     pub fn is_running(&mut self) -> bool {
         // Process is not running because its pid doesn't exist
@@ -74,7 +87,7 @@ impl Process {
                 match child.try_wait() {
                     Ok(Some(exit_code)) => {
                         // Process is not running anymore
-                        self.child = None;
+                        self.cleanup();
                         debug!("Process {} exited with code {}", self.executable, exit_code);
                         Some(ExitStatus::from(exit_code))
                     }
@@ -104,10 +117,11 @@ impl Process {
             Ok(child) => {
                 debug!("Process {} was started", self.executable);
                 self.child = Some(child);
+                self.start_timestamp = Some(Instant::now());
                 Ok(true)
             }
             Err(error) => {
-                self.child = None;
+                self.cleanup();
                 Err(format!("Process {} failed to start: {}", self.executable, error))
             }
         }
@@ -127,7 +141,7 @@ impl Process {
                         match child.wait() {
                             Ok(_) => {
                                 debug!("Process {} was stopped", self.executable);
-                                self.cleanup_process_handles();
+                                self.cleanup();
                                 Ok(true)
                             }
                             Err(error) => {
@@ -138,7 +152,7 @@ impl Process {
                     Err(error) => {
                         if error.kind() == ErrorKind::InvalidInput {
                             debug!("Process {} has already stopped", self.executable);
-                            self.cleanup_process_handles();
+                            self.cleanup();
                             return Ok(true);
                         }
 
@@ -170,6 +184,11 @@ impl Process {
                 Err(error)
             }
         }
+    }
+
+    fn cleanup(&mut self) {
+        self.start_timestamp = None;
+        self.cleanup_process_handles();
     }
 
     fn cleanup_process_handles(&mut self) {

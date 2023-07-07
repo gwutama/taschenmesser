@@ -52,6 +52,7 @@ message Unit {
   ProbeState process_probe_state = 8;
   ProbeState liveness_probe_state = 9;
   int32 pid = 10;
+  uint64 uptime = 11;
 
   enum RestartPolicy {
     Always = 0;
