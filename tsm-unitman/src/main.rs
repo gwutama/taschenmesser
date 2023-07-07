@@ -4,7 +4,7 @@ use log::{error};
 
 mod config;
 mod unit;
-mod rpc_server;
+mod rpc;
 
 
 struct CommandLineParameters {
@@ -79,7 +79,7 @@ fn main() {
 
     // start rpc server
     if configuration.get_rpc_server().is_enabled() {
-        rpc_server::RpcServer::new(
+        rpc::RpcServer::new(
             manager.clone(),
             configuration.get_rpc_server().get_bind_address()
         ).run_threaded();
