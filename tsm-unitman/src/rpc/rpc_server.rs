@@ -3,7 +3,7 @@ use log::{debug, warn};
 use protobuf::{Message, Enum};
 
 use tsm_ipc::{tsm_common_rpc, tsm_unitman_rpc};
-use crate::rpc::converters;
+use crate::rpc::{stop_unit, start_unit, list_units, ping};
 
 use crate::unit;
 
@@ -45,10 +45,10 @@ impl tsm_ipc::RpcRequestHandler for ResponseHandler {
 
         // Handle request based on method
         match request_method {
-            tsm_unitman_rpc::RpcMethod::Ping => self.handle_ping(request),
-            tsm_unitman_rpc::RpcMethod::ListUnits => self.handle_list_units(request),
-            tsm_unitman_rpc::RpcMethod::StartUnit => self.handle_start_unit(request),
-            tsm_unitman_rpc::RpcMethod::StopUnit => self.handle_stop_unit(request),
+            tsm_unitman_rpc::RpcMethod::Ping => ping::handle_ping(request),
+            tsm_unitman_rpc::RpcMethod::ListUnits => list_units::handle_list_units(request, self.unit_manager.clone()),
+            tsm_unitman_rpc::RpcMethod::StartUnit => start_unit::handle_start_unit(request, self.unit_manager.clone()),
+            tsm_unitman_rpc::RpcMethod::StopUnit => stop_unit::handle_stop_unit(request, self.unit_manager.clone()),
             _ => self.handle_unknown(),
         }
     }
@@ -68,171 +68,6 @@ impl ResponseHandler {
         rpc_response.method = tsm_unitman_rpc::RpcMethod::Unknown.value();
         rpc_response.status = false;
         rpc_response.error = format!("Unknown method");
-        return rpc_response;
-    }
-
-    fn handle_ping(&self, request: tsm_common_rpc::RpcRequest) -> tsm_common_rpc::RpcResponse {
-        let mut rpc_response = tsm_common_rpc::RpcResponse::new();
-
-        let ping_request: tsm_unitman_rpc::PingRequest = match Message::parse_from_bytes(&request.data) {
-            Ok(request) => {
-                rpc_response.method = tsm_unitman_rpc::RpcMethod::Ping.value();
-                request
-            },
-            Err(error) => {
-                warn!("Failed to parse ping request: {}", error);
-                rpc_response.method = tsm_unitman_rpc::RpcMethod::Ping.value();
-                rpc_response.status = false;
-                rpc_response.error = format!("Failed to parse ping request: {}", error);
-                return rpc_response;
-            },
-        };
-
-        debug!("Received ping request: {}", ping_request.message);
-
-        let mut ping_response = tsm_unitman_rpc::PingResponse::new();
-        ping_response.message = "pong".to_string();
-
-        match ping_response.write_to_bytes() {
-            Ok(bytes) => {
-                rpc_response.status = true;
-                rpc_response.data = bytes;
-            },
-            Err(error) => {
-                rpc_response.status = false;
-                rpc_response.error = format!("Failed to serialize ping response: {}", error);
-            },
-        }
-
-        return rpc_response;
-    }
-
-    fn handle_list_units(&self, request: tsm_common_rpc::RpcRequest) -> tsm_common_rpc::RpcResponse {
-        let mut rpc_response = tsm_common_rpc::RpcResponse::new();
-
-        let _list_units_request: tsm_unitman_rpc::ListUnitsRequest = match Message::parse_from_bytes(&request.data) {
-            Ok(request) => {
-                rpc_response.method = tsm_unitman_rpc::RpcMethod::ListUnits.value();
-                request
-            },
-            Err(error) => {
-                warn!("Failed to parse list units request: {}", error);
-                rpc_response.method = tsm_unitman_rpc::RpcMethod::ListUnits.value();
-                rpc_response.status = false;
-                rpc_response.error = format!("Failed to parse list units request: {}", error);
-                return rpc_response;
-            },
-        };
-
-        debug!("Received list units request");
-
-        let mut list_units_response = tsm_unitman_rpc::ListUnitsResponse::new();
-
-        match self.unit_manager.try_lock() {
-            Ok(unit_manager) => {
-                list_units_response.units = converters::convert_units_to_proto(&unit_manager.get_units())
-            },
-            Err(error) => {
-                warn!("Failed to lock unit manager: {}", error);
-                rpc_response.status = false;
-                rpc_response.error = format!("Failed to lock unit manager: {}", error);
-                return rpc_response;
-            },
-        }
-
-        match list_units_response.write_to_bytes() {
-            Ok(bytes) => {
-                rpc_response.status = true;
-                rpc_response.data = bytes;
-            },
-            Err(error) => {
-                rpc_response.status = false;
-                rpc_response.error = format!("Failed to serialize list units response: {}", error);
-            },
-        }
-
-        return rpc_response;
-    }
-
-    fn handle_start_unit(&self, request: tsm_common_rpc::RpcRequest) -> tsm_common_rpc::RpcResponse {
-        let mut rpc_response = tsm_common_rpc::RpcResponse::new();
-
-        let start_unit_request: tsm_unitman_rpc::StartUnitRequest = match Message::parse_from_bytes(&request.data) {
-            Ok(request) => {
-                rpc_response.method = tsm_unitman_rpc::RpcMethod::StartUnit.value();
-                request
-            },
-            Err(error) => {
-                warn!("Failed to parse start unit request: {}", error);
-                rpc_response.method = tsm_unitman_rpc::RpcMethod::StartUnit.value();
-                rpc_response.status = false;
-                rpc_response.error = format!("Failed to parse start unit request: {}", error);
-                return rpc_response;
-            },
-        };
-
-        debug!("Received start unit request: {}", start_unit_request.unit_name);
-
-        match self.unit_manager.try_lock() {
-            Ok(unit_manager) => {
-                match unit_manager.start_unit(String::from(start_unit_request.unit_name)) {
-                    Ok(_) => {
-                        rpc_response.status = true;
-                    },
-                    Err(error) => {
-                        rpc_response.status = false;
-                        rpc_response.error = format!("Failed to start unit: {}", error);
-                    },
-                }
-            },
-            Err(error) => {
-                warn!("Failed to lock unit manager: {}", error);
-                rpc_response.status = false;
-                rpc_response.error = format!("Failed to lock unit manager: {}", error);
-            },
-        }
-
-        return rpc_response;
-    }
-
-    fn handle_stop_unit(&self, request: tsm_common_rpc::RpcRequest) -> tsm_common_rpc::RpcResponse {
-        let mut rpc_response = tsm_common_rpc::RpcResponse::new();
-
-        let stop_unit_request: tsm_unitman_rpc::StopUnitRequest = match Message::parse_from_bytes(&request.data) {
-            Ok(request) => {
-                rpc_response.method = tsm_unitman_rpc::RpcMethod::StopUnit.value();
-                request
-            },
-            Err(error) => {
-                warn!("Failed to parse stop unit request: {}", error);
-                rpc_response.method = tsm_unitman_rpc::RpcMethod::StopUnit.value();
-                rpc_response.status = false;
-                rpc_response.error = format!("Failed to parse stop unit request: {}", error);
-                return rpc_response;
-            },
-        };
-
-        debug!("Received stop unit request: {}", stop_unit_request.unit_name);
-
-        match self.unit_manager.try_lock() {
-            Ok(unit_manager) => {
-                match unit_manager.stop_unit(String::from(stop_unit_request.unit_name), false) {
-                    Ok(_) => {
-                        rpc_response.status = true;
-                    },
-                    Err(error) => {
-                        rpc_response.status = false;
-                        rpc_response.error = format!("Failed to stop unit: {}", error);
-                    },
-                }
-            },
-            Err(error) => {
-                warn!("Failed to lock unit manager: {}", error);
-                rpc_response.status = false;
-                rpc_response.error = format!("Failed to lock unit manager: {}", error);
-            },
-        }
-
         return rpc_response;
     }
 }
