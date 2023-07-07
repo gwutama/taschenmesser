@@ -1,6 +1,7 @@
-mod stop_unit;
 mod ping;
 mod list_units;
+mod start_unit;
+mod stop_unit;
 
 use argparse::{ArgumentParser, Store, StoreTrue};
 use tsm_ipc::RpcClient;
@@ -19,6 +20,7 @@ fn main() {
     let mut ping = false;
     let mut list_units = false;
     let mut stop_unit = String::new();
+    let mut start_unit = String::new();
 
     {
         let mut ap = ArgumentParser::new();
@@ -26,6 +28,7 @@ fn main() {
         ap.refer(&mut ping).add_option(&["--ping"], StoreTrue, "Test connection to unit manager");
         ap.refer(&mut list_units).add_option(&["--list"], StoreTrue, "List all configured units");
         ap.refer(&mut stop_unit).add_option(&["--stop"], Store, "Stop a unit");
+        ap.refer(&mut start_unit).add_option(&["--start"], Store, "Start a unit");
         ap.parse_args_or_exit();
     }
 
@@ -46,6 +49,11 @@ fn main() {
         };
     } else if !stop_unit.is_empty() {
         match stop_unit::send_stop_unit_request(rpc_client, stop_unit) {
+            Ok(response) => println!("{}", response.message),
+            Err(error) => println!("{}", error),
+        };
+    } else if !start_unit.is_empty() {
+        match start_unit::send_start_unit_request(rpc_client, start_unit) {
             Ok(response) => println!("{}", response.message),
             Err(error) => println!("{}", error),
         };
