@@ -45,6 +45,43 @@ impl UnitManager {
         &self.units
     }
 
+    pub fn start_unit(&self, name: String) -> Result<bool, String> {
+        for unit in &self.units {
+            match unit.try_lock() {
+                Ok(mut unit) => {
+                    if unit.get_name() == name {
+                        if unit.is_running() {
+                            debug!("Unit {} is already running", unit.get_name());
+                            return Ok(true);
+                        }
+
+                        debug!("Starting unit {}", unit.get_name());
+
+                        match unit.start() {
+                            Ok(_) => {
+                                unit.set_restart_policy(RestartPolicy::DisabledTemporarily);
+                                unit.start_probes();
+
+                                debug!("Started unit {}", unit.get_name());
+                                return Ok(true);
+                            },
+                            Err(e) => {
+                                warn!("Error starting unit {}: {}", unit.get_name(), e);
+                                return Err(format!("Error starting unit {}: {}", unit.get_name(), e));
+                            },
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("Error acquiring lock while starting unit: {}", e);
+                    return Err(format!("Error acquiring lock while starting unit: {}", e));
+                },
+            }
+        }
+
+        Err(format!("Unit {} not found", name))
+    }
+
     /// Iterate over all units and try to start them
     /// Note that we need to call this function several times until all dependencies are started
     fn start_units(&mut self) {
@@ -75,6 +112,11 @@ impl UnitManager {
             match unit.try_lock() {
                 Ok(mut unit) => {
                     if unit.get_name() == name {
+                        if !unit.is_running() {
+                            debug!("Unit {} is already stopped", unit.get_name());
+                            return Ok(true);
+                        }
+
                         info!("Stopping unit {}", unit.get_name());
 
                         // stopping unit will automatically stop its probes and cleanup its resources
