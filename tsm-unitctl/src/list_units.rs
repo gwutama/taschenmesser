@@ -3,6 +3,33 @@ use protobuf::{Message, Enum};
 use tabled::{builder::Builder, settings::Style};
 
 
+pub fn send_list_units_request(rpc_client: RpcClient) -> Result<tsm_unitman_rpc::ListUnitsResponse, String> {
+    let unit_list_request = build_list_units_request();
+
+    let response = match rpc_client.send(unit_list_request) {
+        Ok(response) => response,
+        Err(error) =>  return Err(format!("{}", error)),
+    };
+
+    if !response.status {
+        return Err(format!("{}", response.error));
+    }
+
+    return match tsm_unitman_rpc::ListUnitsResponse::parse_from_bytes(&response.data) {
+        Ok(list_units_response) => Ok(list_units_response),
+        Err(error) => Err(format!("Failed to parse response: {}", error)),
+    };
+}
+
+
+fn build_list_units_request() -> tsm_common_rpc::RpcRequest {
+    let mut request = tsm_common_rpc::RpcRequest::new();
+    request.method = tsm_unitman_rpc::RpcMethod::ListUnits.value();
+
+    request
+}
+
+
 pub fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
     let mut builder = Builder::new();
     builder.set_header(vec!["UNIT NAME", "IS ENABLED", "RESTART POLICY", "RUN STATE", "PROCESS STATE", "LIVENESS STATE", "COMMAND"]);
@@ -55,34 +82,4 @@ pub fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
 
     let table = table.to_string();
     println!("{}", table);
-}
-
-
-pub fn send_list_units_request(rpc_client: RpcClient) -> Result<tsm_unitman_rpc::ListUnitsResponse, String> {
-    let unit_list_request = build_list_units_request();
-
-    let response = match rpc_client.send(unit_list_request) {
-        Ok(response) => response,
-        Err(error) => {
-            return Err(format!("ListUnits = No response received: {}", error));
-        },
-    };
-
-    // TODO: parse response.method, response.status and response.error too!
-    return match tsm_unitman_rpc::ListUnitsResponse::parse_from_bytes(&response.data) {
-        Ok(list_units_response) => {
-            Ok(list_units_response)
-        },
-        Err(error) => {
-            Err(format!("ListUnits = Failed to parse ListUnits response: {}", error))
-        }
-    };
-}
-
-
-fn build_list_units_request() -> tsm_common_rpc::RpcRequest {
-    let mut request = tsm_common_rpc::RpcRequest::new();
-    request.method = tsm_unitman_rpc::RpcMethod::ListUnits.value();
-
-    request
 }

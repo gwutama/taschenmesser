@@ -2,7 +2,6 @@ mod stop_unit;
 mod ping;
 mod list_units;
 
-use log::{warn};
 use argparse::{ArgumentParser, Store, StoreTrue};
 use tsm_ipc::RpcClient;
 
@@ -24,8 +23,8 @@ fn main() {
     {
         let mut ap = ArgumentParser::new();
         ap.set_description("Taschenmesser Unit Control");
-        ap.refer(&mut ping).add_option(&["-p", "--ping"], StoreTrue, "Test connection to unit manager");
-        ap.refer(&mut list_units).add_option(&["-l", "--list"], StoreTrue, "List all configured units");
+        ap.refer(&mut ping).add_option(&["--ping"], StoreTrue, "Test connection to unit manager");
+        ap.refer(&mut list_units).add_option(&["--list"], StoreTrue, "List all configured units");
         ap.refer(&mut stop_unit).add_option(&["--stop"], Store, "Stop a unit");
         ap.parse_args_or_exit();
     }
@@ -36,21 +35,19 @@ fn main() {
     };
 
     if ping {
-        match ping::send_ack_request(rpc_client, String::from("ping")) {
-            Ok(ack_response) => println!("Received response: {:?}", ack_response.message),
-            Err(error) => warn!("No response received: {}", error),
+        match ping::send_ping_request(rpc_client, String::from("ping")) {
+            Ok(response) => println!("{}", response.message),
+            Err(error) => println!("{}", error),
         };
     } else if list_units {
         match list_units::send_list_units_request(rpc_client) {
-            Ok(list_units_response) => {
-                list_units::print_units(list_units_response.units);
-            },
-            Err(error) => warn!("No response received: {}", error),
+            Ok(list_units_response) => list_units::print_units(list_units_response.units),
+            Err(error) => println!("{}", error),
         };
     } else if !stop_unit.is_empty() {
         match stop_unit::send_stop_unit_request(rpc_client, stop_unit) {
-            Ok(response) => println!("Received response: {:?}", response.message),
-            Err(error) => warn!("No response received: {}", error),
+            Ok(response) => println!("{}", response.message),
+            Err(error) => println!("{}", error),
         };
     } else {
         println!("No command specified. Use --help for more information.");

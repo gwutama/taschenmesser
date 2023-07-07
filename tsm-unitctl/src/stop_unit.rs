@@ -7,18 +7,16 @@ pub fn send_stop_unit_request(rpc_client: RpcClient, unit_name: String) -> Resul
 
     let response = match rpc_client.send(stop_unit_request) {
         Ok(response) => response,
-        Err(error) => {
-            return Err(format!("StopUnit = No response received: {}", error));
-        },
+        Err(error) =>  return Err(format!("{}", error)),
     };
 
+    if !response.status {
+        return Err(format!("{}", response.error));
+    }
+
     return match tsm_unitman_rpc::StopUnitResponse::parse_from_bytes(&response.data) {
-        Ok(stop_unit_response) => {
-            Ok(stop_unit_response)
-        },
-        Err(error) => {
-            Err(format!("StopUnit = Failed to parse StopUnit response: {}", error))
-        }
+        Ok(stop_unit_response) => Ok(stop_unit_response),
+        Err(error) => Err(format!("Failed to parse response: {}", error)),
     };
 }
 
