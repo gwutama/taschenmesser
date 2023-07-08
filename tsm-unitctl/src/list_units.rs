@@ -34,7 +34,7 @@ fn build_list_units_request() -> tsm_common_rpc::RpcRequest {
 
 pub fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
     let mut builder = Builder::new();
-    builder.set_header(vec!["UNIT NAME", "IS ENABLED", "RESTART POLICY", "RUN STATE", "PROCESS STATE", "LIVENESS STATE", "UPTIME", "COMMAND"]);
+    builder.set_header(vec!["NAME", "IS ENABLED", "RESTART POLICY", "STATE", "LIVENESS", "UPTIME", "COMMAND"]);
 
     for unit in units {
         let enabled = match unit.enabled {
@@ -72,9 +72,16 @@ pub fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
         let command = format!("{} {}", unit.executable, unit.arguments.join(" "));
 
         // TODO: Consider that unit state should not based solely on pid. We need these states: Stopped, Running, Stuck
-        let run_state: String = match unit.pid {
-            n if n > 0 => String::from(format!("Running (pid={})", n)),
-            _ => String::from("Stopped"),
+        let unit_state: String = match tsm_unitman_rpc::unit::UnitState::from_i32(unit.state.value()) {
+            Some(state) => match state {
+                tsm_unitman_rpc::unit::UnitState::Starting => String::from("Starting"),
+                tsm_unitman_rpc::unit::UnitState::Running => String::from("Running"),
+                tsm_unitman_rpc::unit::UnitState::RunningAndHealthy => String::from("Running (Healthy)"),
+                tsm_unitman_rpc::unit::UnitState::RunningButDegraded => String::from("Running (Degraded)"),
+                tsm_unitman_rpc::unit::UnitState::Stopping => String::from("Stopping"),
+                tsm_unitman_rpc::unit::UnitState::Stopped => String::from("Stopped"),
+            },
+            None => String::from("Unknown"),
         };
 
         let uptime = if unit.pid > 0 { // if running
@@ -84,7 +91,7 @@ pub fn print_units(units: Vec<tsm_unitman_rpc::Unit>) {
             String::from("-")
         };
 
-        builder.push_record([unit.name, enabled, restart_policy, run_state, process_probe_state, liveness_probe_state, uptime, command]);
+        builder.push_record([unit.name, enabled, restart_policy, unit_state, liveness_probe_state, uptime, command]);
     }
 
     let mut table = builder.build();

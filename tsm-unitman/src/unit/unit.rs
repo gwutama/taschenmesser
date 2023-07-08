@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use log::{debug, warn};
 
-use crate::unit::{RestartPolicy, ProcessProbe, LivenessProbe, ProbeState, Process, ProbeManager};
+use crate::unit::{RestartPolicy, ProcessProbe, LivenessProbe, ProbeState, Process, ProbeManager, UnitState};
 
 
 pub type UnitRef = Arc<Mutex<Unit>>;
@@ -16,6 +16,7 @@ pub struct Unit {
     enabled: bool,
     process: Process,
     probe_manager: ProbeManager,
+    state: UnitState,
 }
 
 
@@ -44,6 +45,7 @@ impl Unit {
             enabled,
             process,
             probe_manager: ProbeManager::new(name.clone()),
+            state: UnitState::Stopped,
         }
     }
 
@@ -91,6 +93,19 @@ impl Unit {
         self.process.get_pid()
     }
 
+    pub fn get_state(&self) -> UnitState {
+        return match self.state {
+            UnitState::Running => {
+                if self.get_process_probe_state() == ProbeState::Alive {
+                    UnitState::RunningAndHealthy
+                } else {
+                    UnitState::RunningButDegraded
+                }
+            }
+            _ => self.state.clone(),
+        }
+    }
+
     pub fn get_process_probe_state(&self) -> ProbeState {
         self.probe_manager.get_process_probe_state()
     }
@@ -104,14 +119,8 @@ impl Unit {
     }
 
     /// Checks if the unit is running.
-    /// Called periodically by unit manager.
     pub fn is_running(&mut self) -> bool {
-        if self.process.is_running() {
-            return true;
-        }
-
-        // Process might be still running, check whether its pid is still valid
-        return self.get_process_probe_state() == ProbeState::Alive
+        self.process.is_running() || self.get_process_probe_state() == ProbeState::Alive // Do a double check
     }
 
     /// Starts the child process
@@ -122,6 +131,8 @@ impl Unit {
         }
 
         debug!("Starting unit {}", self.name);
+
+        self.state = UnitState::Starting;
 
         match self.start_dependencies() {
             Ok(_) => {}
@@ -134,9 +145,11 @@ impl Unit {
             Ok(_) => {
                 debug!("Unit {} was started", self.name);
                 self.init_process_probe();
+                self.state = UnitState::Running;
                 Ok(true)
             }
             Err(error) => {
+                self.state = UnitState::Stopped;
                 Err(format!("Unit {} failed to start: {}", self.name, error))
             }
         }
@@ -177,13 +190,18 @@ impl Unit {
     pub fn stop(&mut self) -> Result<bool, String> {
         debug!("Stopping unit {}", self.name);
 
+        let current_state = self.get_state();
+        self.state = UnitState::Stopping;
+
         match self.process.stop() {
             Ok(_) => {
                 self.stop_probes();
+                self.state = UnitState::Stopped;
                 debug!("Unit {} was stopped", self.name);
                 Ok(true)
             }
             Err(error) => {
+                self.state = current_state;
                 Err(format!("Unit {} failed to stop: {}", self.name, error))
             }
         }

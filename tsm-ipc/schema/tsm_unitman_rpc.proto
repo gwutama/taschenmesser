@@ -53,6 +53,7 @@ message Unit {
   ProbeState liveness_probe_state = 9;
   int32 pid = 10;
   uint64 uptime = 11;
+  UnitState state = 12;
 
   enum RestartPolicy {
     Always = 0;
@@ -64,5 +65,14 @@ message Unit {
     Undefined = 0;
     Alive = 1;
     Dead = 2;
+  }
+
+  enum UnitState {
+    Starting = 0;
+    Running = 1;
+    RunningAndHealthy = 2;
+    RunningButDegraded = 3;
+    Stopping = 4;
+    Stopped = 5;
   }
 }

@@ -31,6 +31,7 @@ pub fn convert_unit_to_proto(unit: &unit::UnitRef) -> Result<tsm_unitman_rpc::Un
             proto_unit.enabled = unit.is_enabled();
             proto_unit.process_probe_state = EnumOrUnknown::from_i32(unit.get_process_probe_state().clone() as i32);
             proto_unit.liveness_probe_state = EnumOrUnknown::from_i32(unit.get_liveness_probe_state().clone() as i32);
+            proto_unit.state = EnumOrUnknown::from_i32(unit.get_state().clone() as i32);
 
             match unit.get_pid() {
                 Some(pid) => proto_unit.pid = pid as i32,

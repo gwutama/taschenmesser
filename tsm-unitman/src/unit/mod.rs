@@ -1,3 +1,6 @@
+mod unit_state;
+pub use unit_state::UnitState;
+
 mod unit;
 pub use unit::{Unit, UnitRef};
 
