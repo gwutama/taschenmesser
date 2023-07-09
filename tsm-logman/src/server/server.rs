@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::io;
 use tokio::net::UdpSocket;
+use crate::server::syslog;
 
 
 pub struct UdpServer {
@@ -27,18 +28,23 @@ impl UdpServer {
         } = self;
 
         loop {
-            // First we check to see if there's a message we need to echo back.
-            // If so then we try to send it back to the original source, waiting
-            // until it's writable and we're able to do so.
+            // First we check to see if there's a message we need to process.
             if let Some((size, peer)) = to_send {
                 let buffer = &mut buf[..size];
-                buffer.reverse();
-                let amt = socket.send_to(buffer, &peer).await?;
-                println!("Echoed {}/{} bytes to {}", amt, size, peer);
+
+                // Parse syslog message
+                match syslog::parse(peer, size, buffer) {
+                    Some(msg) => println!("{:?}", msg),
+                    None => {
+                        match std::str::from_utf8(buffer) {
+                            Ok(s) => eprintln!("error parsing: {}", s),
+                            Err(e) => eprintln!("received message not parseable and not UTF-8: {}", e),
+                        }
+                    }
+                }
             }
 
-            // If we're here then `to_send` is `None`, so we take a look for the
-            // next message we're going to echo back.
+            // If we're here then `to_send` is `None`, so we take a look for the next message to process.
             to_send = Some(socket.recv_from(&mut buf).await?);
         }
     }
