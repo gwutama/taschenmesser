@@ -1,10 +1,11 @@
+use std::error::Error;
 use std::process::exit;
-use std::net::UdpSocket;
-use std::thread;
 use log::{error};
+use tokio::net::UdpSocket;
 use argparse::{ArgumentParser, Store};
 
 mod config;
+mod server;
 
 
 struct CommandLineParameters {
@@ -49,39 +50,8 @@ fn init_logger(configuration: &config::Configuration) {
 }
 
 
-fn start_listen(host: String, port: u16) {
-    let addr = format!("{}:{}", host, port);
-    let socket = UdpSocket::bind(addr.clone()).expect("couldn't bind to address");
-    let mut buf = [0; 4096];
-
-    println!("Listening on {}", addr.clone());
-
-    loop {
-        match socket.try_clone() {
-            Ok(socket) => {
-                match socket.recv_from(&mut buf) {
-                    Ok((amt, src)) => {
-                        thread::spawn(move || {
-                            println!("Received {} bytes from {}", amt, src);
-                            let buffer = &mut buf[..amt];
-                            buffer.reverse();
-                            socket.send_to(buffer, &src).expect("couldn't send data");
-                        });
-                    }
-                    Err(e) => {
-                        println!("couldn't receive a datagram: {}", e);
-                    }
-                }
-            }
-            Err(e) => {
-                println!("couldn't clone socket: {}", e);
-            }
-        }
-    }
-}
-
-
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     let params = parse_args_or_exit();
 
     // init stuffs
@@ -89,6 +59,17 @@ fn main() {
     init_logger(&configuration);
 
     // start server
-    start_listen(configuration.get_server().get_host(),
-                 configuration.get_server().get_port());
+    let host = configuration.get_server().get_host();
+    let port = configuration.get_server().get_port();
+    let addr = format!("{}:{}", host, port);
+    let socket = UdpSocket::bind(addr.clone()).await?;
+
+    println!("Listening on: {}", socket.local_addr()?);
+
+    let server = server::UdpServer::new(socket);
+
+    // This starts the server task.
+    server.run().await?;
+
+    Ok(())
 }
