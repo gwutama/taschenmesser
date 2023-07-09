@@ -828,6 +828,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tsm-logman"
+version = "0.1.0"
+dependencies = [
+ "argparse",
+ "env_logger",
+ "log",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "tsm-unitctl"
 version = "0.1.0"
 dependencies = [

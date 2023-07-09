@@ -4,4 +4,5 @@ members = [
     "tsm-ipc",
     "tsm-unitman",
     "tsm-unitctl",
+    "tsm-logman",
 ]

@@ -1,0 +1,6 @@
+[application]
+log_level = "trace"                     # Optional. Defaults to "info". Possible values: "debug", "info", "warn", "error", "trace".
+
+[server]
+host = "127.0.0.1"                      # Optional. Defaults to "localhost".
+port = 5140                             # Optional. Defaults to 514.
