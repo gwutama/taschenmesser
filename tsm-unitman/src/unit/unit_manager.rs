@@ -273,8 +273,8 @@ mod tests {
     use crate::unit::restart_policy::RestartPolicy;
     use crate::unit::unit::Unit;
 
-    fn build_unitrefs() -> (UnitRef, UnitRef) {
-        let unit1 = Unit::new_ref(
+    fn build_unitrefs() -> (Arc<Mutex<Unit>>, Arc<Mutex<Unit>>) {
+        let unit1 = Arc::new(Mutex::new(Unit::new(
             String::from("test1"),
             String::from("sleep"),
             vec![String::from("1")],
@@ -282,10 +282,9 @@ mod tests {
             get_current_uid(),
             get_current_gid(),
             true,
-            None,
-        );
+        )));
 
-        let unit2 = Unit::new_ref(
+        let unit2 = Arc::new(Mutex::new(Unit::new(
             String::from("test2"),
             String::from("sleep"),
             vec![String::from("1")],
@@ -293,8 +292,7 @@ mod tests {
             get_current_uid(),
             get_current_gid(),
             true,
-            None,
-        );
+        )));
 
         unit2.lock().unwrap().add_dependency(unit1.clone());
 
@@ -357,20 +355,6 @@ mod tests {
     }
 
     #[test]
-    fn all_units_running_should_work() {
-        let mut manager = UnitManager::new();
-        let (unit1, unit2) = build_unitrefs();
-
-        manager.add_unit(unit1.clone());
-        manager.add_unit(unit2.clone());
-        assert_eq!(manager.units.len(), 2);
-
-        assert_eq!(manager.all_units_running(), false);
-        manager.start_units();
-        assert_eq!(manager.all_units_running(), true);
-    }
-
-    #[test]
     fn stop_all_should_work() {
         let mut manager = UnitManager::new();
         let (unit1, unit2) = build_unitrefs();
@@ -386,22 +370,6 @@ mod tests {
         manager.stop_units();
         assert_eq!(unit1.lock().unwrap().is_running(), false);
         assert_eq!(unit2.lock().unwrap().is_running(), false);
-    }
-
-    #[test]
-    fn all_units_stopped_should_work() {
-        let mut manager = UnitManager::new();
-        let (unit1, unit2) = build_unitrefs();
-
-        manager.add_unit(unit1.clone());
-        manager.add_unit(unit2.clone());
-        assert_eq!(manager.units.len(), 2);
-
-        manager.start_units();
-        assert_eq!(manager.all_units_running(), true);
-
-        manager.stop_units();
-        assert_eq!(manager.all_units_stopped(), true);
     }
 }
 

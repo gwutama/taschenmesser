@@ -69,6 +69,10 @@ impl Unit {
         self.dependencies.push(unit);
     }
 
+    pub fn get_dependencies(&self) -> Vec<UnitRef> {
+        self.dependencies.clone()
+    }
+
     pub fn get_restart_policy(&self) -> RestartPolicy {
         self.restart_policy.clone()
     }
@@ -194,11 +198,11 @@ impl Unit {
         self.state = UnitState::Stopping;
 
         match self.process.stop() {
-            Ok(_) => {
+            Ok(success) => { // true if process was running, false if process was not running
                 self.stop_probes();
                 self.state = UnitState::Stopped;
                 debug!("Unit {} was stopped", self.name);
-                Ok(true)
+                Ok(success)
             }
             Err(error) => {
                 self.state = current_state;
@@ -298,32 +302,29 @@ mod tests {
             get_current_uid(),
             get_current_gid(),
             true,
-            None,
         );
     }
 
-    fn build_unitrefs() -> (UnitRef, UnitRef) {
-        let unit1 = Unit::new_ref(
+    fn build_unitrefs() -> (Arc<Mutex<Unit>>, Arc<Mutex<Unit>>) {
+        let unit1 = Arc::new(Mutex::new(Unit::new(
             String::from("test1"),
-            String::from("ls"),
-            vec![],
+            String::from("sleep"),
+            vec![String::from("1")],
             RestartPolicy::Always,
             get_current_uid(),
             get_current_gid(),
             true,
-            None,
-        );
+        )));
 
-        let unit2 = Unit::new_ref(
+        let unit2 = Arc::new(Mutex::new(Unit::new(
             String::from("test2"),
-            String::from("ls"),
-            vec![],
+            String::from("sleep"),
+            vec![String::from("1")],
             RestartPolicy::Never,
             get_current_uid(),
             get_current_gid(),
             true,
-            None,
-        );
+        )));
 
         unit2.lock().unwrap().add_dependency(unit1.clone());
 
@@ -335,8 +336,8 @@ mod tests {
         let unit = build_unit();
 
         assert_eq!(unit.name, "test");
-        assert_eq!(unit.executable, "sleep");
-        assert_eq!(unit.arguments, vec!["1"]);
+        assert_eq!(unit.process.get_executable(), "sleep");
+        assert_eq!(unit.process.get_arguments(), vec!["1"]);
         assert_eq!(unit.dependencies.is_empty(), true);
         assert_eq!(unit.restart_policy, RestartPolicy::Never);
         assert_eq!(unit.enabled, true);
@@ -396,7 +397,8 @@ mod tests {
     fn cannot_stop_if_already_stopped() {
         let mut unit = build_unit();
 
-        assert!(unit.stop().is_err());
+        assert_eq!(unit.is_running(), false);
+        assert_eq!(unit.stop().unwrap(), false);
     }
 
     #[test]
@@ -409,11 +411,14 @@ mod tests {
     }
 
     #[test]
-    fn cannot_start_when_dependent_unit_is_not_running() {
+    fn can_start_but_start_dependencies_too() {
         let (unit1, unit2) = build_unitrefs();
 
         assert_eq!(unit1.lock().unwrap().is_running(), false);
-        assert_eq!(unit2.lock().unwrap().can_start(), false);
+        assert_eq!(unit2.lock().unwrap().is_running(), false);
+        unit2.lock().unwrap().start().unwrap(); // unit2 depends on unit1, hence it starts unit1 too
+        assert_eq!(unit1.lock().unwrap().is_running(), true);
+        assert_eq!(unit2.lock().unwrap().is_running(), true);
     }
 
     #[test]
