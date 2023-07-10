@@ -115,6 +115,50 @@ pub struct SyslogMsg {
 }
 
 impl SyslogMsg {
+    pub fn get_from(&self) -> SocketAddr {
+        self.from
+    }
+
+    pub fn get_facility(&self) -> u8 {
+        self.facility
+    }
+
+    pub fn get_severity(&self) -> u8 {
+        self.severity
+    }
+
+    pub fn get_version(&self) -> u8 {
+        self.version
+    }
+
+    pub fn get_timestamp(&self) -> Option<DateTime<Utc>> {
+        self.timestamp
+    }
+
+    pub fn get_hostname(&self) -> Option<String> {
+        self.hostname.clone()
+    }
+
+    pub fn get_appname(&self) -> Option<String> {
+        self.appname.clone()
+    }
+
+    pub fn get_procid(&self) -> Option<String> {
+        self.procid.clone()
+    }
+
+    pub fn get_msgid(&self) -> Option<String> {
+        self.msgid.clone()
+    }
+
+    pub fn get_sdata(&self) -> Option<HashMap<String, String>> {
+        self.sdata.clone()
+    }
+
+    pub fn get_msg(&self) -> Option<String> {
+        self.msg.clone()
+    }
+
     fn from_version_1(
         from: SocketAddr,
         len: usize,

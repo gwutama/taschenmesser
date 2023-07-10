@@ -6,6 +6,7 @@ use argparse::{ArgumentParser, Store};
 
 mod config;
 mod server;
+mod persistence;
 
 
 struct CommandLineParameters {
