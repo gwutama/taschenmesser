@@ -2,6 +2,7 @@ use chrono::prelude::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::str;
+use chrono::LocalResult;
 
 // ASL facility codes
 const LOG_KERN: u8 = 0;
@@ -333,20 +334,25 @@ impl SyslogMsg {
             Some(val) => Some(val.to_string()),
             None => None,
         };
-        let timestamp = Utc.timestamp(time_sec, time_nanosec);
-        return Some(SyslogMsg {
-            from: from,
-            facility: facility,
-            severity: severity,
-            version: 0,
-            timestamp: Some(timestamp),
-            hostname: hostname,
-            appname: appname,
-            procid: procid,
-            msgid: None,
-            msg: msg,
-            sdata: Some(sdata),
-        });
+        return match Utc.timestamp_opt(time_sec, time_nanosec) {
+            LocalResult::Single(ts) => {
+                Some(SyslogMsg {
+                    from: from,
+                    facility: facility,
+                    severity: severity,
+                    version: 0,
+                    timestamp: Some(ts),
+                    hostname: hostname,
+                    appname: appname,
+                    procid: procid,
+                    msgid: None,
+                    msg: msg,
+                    sdata: Some(sdata),
+                })
+            },
+            LocalResult::None => None,
+            LocalResult::Ambiguous(_, _) => None,
+        };
     }
 }
 
